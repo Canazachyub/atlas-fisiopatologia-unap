@@ -2,9 +2,9 @@
 (function () {
   "use strict";
   const E = window.ECG, U = window.UTIL, SECC = window.SECC, $ = U.$, $$ = U.$$, css = U.css;
-  const raf = f => { const id = requestAnimationFrame(f); U._raf = id; return id; };
+  const raf = f => { const g = U._gen || 0, id = requestAnimationFrame(t => { if ((U._gen || 0) === g) f(t); }); U._raf = id; return id; };
   const detenerPrev = U.detener;
-  U.detener = () => { detenerPrev(); if (U._raf) cancelAnimationFrame(U._raf); U._raf = null; (U._timers || []).forEach(clearInterval); U._timers = []; };
+  U.detener = () => { U._gen = (U._gen || 0) + 1; detenerPrev(); if (U._raf) cancelAnimationFrame(U._raf); U._raf = null; (U._timers || []).forEach(clearInterval); U._timers = []; };
   const cada = (f, ms) => { const id = setInterval(f, ms); (U._timers = U._timers || []).push(id); return id; };
   const deg = r => r * 180 / Math.PI;
 
@@ -45,10 +45,13 @@
     const S = $("#cz svg");
     S.insertAdjacentHTML("beforeend", ESTRUCT.map((x, i) => `<g class="hit" data-i="${i}" transform="translate(${x.p[0]},${x.p[1]})">
       <circle r="24" class="marcador"/><text text-anchor="middle" dy="9" font-size="26" font-weight="800" fill="#1b1b1b">${i + 1}</text></g>`).join(""));
+    S.insertAdjacentHTML("beforeend", `<circle id="a-anillo" r="44" fill="none" stroke="#22d3ee" stroke-width="8" opacity="0"/>`);
     const base = { aur: 0, sa: 0, av: 0, his: 0, rd: 0, ri: 0, purk: 0, ven: 0, vd: 0, vi: 0, rep: 0, bloqueo: 0 };
     let sel = -1;
     function elegir(i) {
       sel = i; const x = ESTRUCT[i];
+      $$(".hit", S).forEach(g => g.style.opacity = +g.dataset.i === i ? 1 : 0.45);
+      const an = $("#a-anillo", S); an.setAttribute("cx", x.p[0]); an.setAttribute("cy", x.p[1]);
       $("#a-info").innerHTML = `<h3 style="margin-top:0">${i + 1}. ${x.n}</h3><p>${x.t}</p>
         <div class="ctrl">${i > 0 ? `<button class="btn sec" id="ant">← ${ESTRUCT[i - 1].n}</button>` : ""}${i < ESTRUCT.length - 1 ? `<button class="btn" id="sig">${ESTRUCT[i + 1].n} →</button>` : ""}</div>`;
       $("#ant") && ($("#ant").onclick = () => elegir(i - 1)); $("#sig") && ($("#sig").onclick = () => elegir(i + 1));
@@ -56,6 +59,7 @@
     $$(".hit", S).forEach(g => g.onclick = () => elegir(+g.dataset.i));
     let fase = 0;
     cada(() => { fase = (fase + 1) % 40; const x = sel >= 0 ? ESTRUCT[sel] : null;
+      if (x) { const an = $("#a-anillo", S), u = (fase % 20) / 20; an.setAttribute("r", 30 + 40 * u); an.setAttribute("opacity", 0.9 * (1 - u)); }
       pintar(Object.assign({}, base, x ? x.e : {}, x && fase % 20 > 12 ? { sa: 0, av: 0 } : {}), { tipo: "normal" }); }, 60);
     pintar(base, { tipo: "normal" });
   };
@@ -63,6 +67,30 @@
   /* =====================================================================
      FÍSICA: dipolo, proyección y planos
      ===================================================================== */
+  /* complejos en columnas: cada derivación en su recuadro, con su propia escala de tiempo (para ampliar el QRS) */
+  U.columnas = function (cv, ecg, ders, opc) {
+    const w = cv.clientWidth || 600, H = opc.alto || 170, d = Math.min(2, devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * d) || cv.height !== Math.round(H * d)) { cv.width = Math.round(w * d); cv.height = Math.round(H * d); cv.style.height = H + "px"; }
+    const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0);
+    c.fillStyle = css("--papel-ecg"); c.fillRect(0, 0, w, H);
+    const n = ders.length, colW = w / n, top = 26, bot = H - 10, y0 = top + (bot - top) * (opc.base || 0.62), k = (bot - top) * (opc.mvAlto || 0.32);
+    const paso = Math.max(4, k / 10);   // grilla: 1 mm = 0.1 mV en la escala vertical
+    c.lineWidth = 1;
+    for (let y = y0 % paso; y < H; y += paso) { c.strokeStyle = Math.round((y - y0) / paso) % 5 ? css("--linea-ecg") : css("--linea-ecg2"); c.beginPath(); c.moveTo(0, y + .5); c.lineTo(w, y + .5); c.stroke(); }
+    for (let x = 0; x < w; x += paso) { c.strokeStyle = Math.round(x / paso) % 5 ? css("--linea-ecg") : css("--linea-ecg2"); c.beginPath(); c.moveTo(x + .5, 0); c.lineTo(x + .5, H); c.stroke(); }
+    ders.forEach((der, i) => {
+      const x0 = i * colW + 8, x1 = (i + 1) * colW - 8, X = t => x0 + (t - opc.t0) / (opc.t1 - opc.t0) * (x1 - x0);
+      if (i) { c.strokeStyle = css("--borde"); c.lineWidth = 1.5; c.beginPath(); c.moveTo(i * colW, 4); c.lineTo(i * colW, H - 4); c.stroke(); }
+      c.fillStyle = (opc.rojas || []).includes(der) ? css("--ro") : css("--az"); c.font = "700 14px Fredoka, Nunito, sans-serif"; c.fillText(der, x0, 17);
+      const traza = (t1, col, ancho, alfa) => { c.globalAlpha = alfa; c.strokeStyle = col; c.lineWidth = ancho; c.lineJoin = "round"; c.beginPath();
+        for (let t = opc.t0, j = 0; t <= t1 + 1e-9; t += (opc.t1 - opc.t0) / 260, j++) { const px = X(t), py = Math.max(top - 4, Math.min(bot + 4, y0 - E.valor(ecg, der, t) * k)); j ? c.lineTo(px, py) : c.moveTo(px, py); }
+        c.stroke(); c.globalAlpha = 1; };
+      if (opc.hasta != null) traza(opc.t1, css("--traza"), 1.5, 0.22);   // silueta completa, tenue
+      traza(opc.hasta != null ? Math.min(opc.t1, opc.hasta) : opc.t1, css("--traza"), 2.3, 1);
+      if (opc.hasta != null && opc.hasta <= opc.t1) { const px = X(opc.hasta), py = y0 - E.valor(ecg, der, opc.hasta) * k; c.fillStyle = css("--ro"); c.beginPath(); c.arc(px, py, 4.5, 0, 7); c.fill(); }
+    });
+  };
+
   SECC.fisica = function (main) {
     main.innerHTML = `<h1>La física del ECG <span class="lit">literatura</span></h1>
       <p class="lema">El ECG no mide el corazón "por dentro": mide desde la piel la <b>diferencia de potencial</b> que crea el frente de activación. Tres ideas bastan para entender todo el trazado.</p>
@@ -73,48 +101,69 @@
           <rect id="dp-act" x="0" y="300" width="0" height="400" fill="#ef4444" opacity=".42" style="mix-blend-mode:multiply"/>
           <rect id="dp-rec" x="0" y="300" width="0" height="400" fill="#3b82f6" opacity=".3" style="mix-blend-mode:multiply"/>
           <g id="dp-carg" font-size="46" font-weight="800" font-family="Fredoka"></g>
+          <g id="dp-rayos" stroke-width="6" stroke-dasharray="18 12" fill="none"></g>
           <line id="dp-vec" x1="0" y1="250" x2="0" y2="250" stroke="#1E3A8A" stroke-width="12" marker-end="url(#pf)"/>
           ${[["E1", 1470, 500], ["E2", 66, 500], ["E3", 768, 150]].map(([n, x, y]) => `<g transform="translate(${x},${y})"><circle r="34" fill="#FACC15" stroke="#1b1b1b" stroke-width="4"/><text text-anchor="middle" dy="13" font-size="34" font-weight="800">${n.slice(1)}</text></g>`).join("")}
         </svg></div>
         <div class="ctrl"><button class="btn" id="dp-dep">⚡ Despolarizar</button><button class="btn sec" id="dp-rep">💧 Repolarizar</button><span class="nota" id="dp-est"></span></div>
         <div class="ctrl"><button class="btn sec" id="dp-p">⏸ Pausa</button><button class="btn sec" id="dp-s">Paso ⏭</button>
           <label>Velocidad <input type="range" id="dp-v" min="0.1" max="2" step="0.05" value="1"></label></div></div>
-      <div><div class="grid3" style="grid-template-columns:1fr">${[1, 2, 3].map(i => `<div class="caja" style="padding:8px 10px"><b>Electrodo ${i}</b> <span class="nota">${["a la derecha: la onda viene hacia él", "a la izquierda: la onda se aleja", "arriba: la onda pasa de costado"][i - 1]}</span><canvas class="ecg" id="dp-c${i}" style="height:70px"></canvas></div>`).join("")}</div>
+      <div><div class="grid3" style="grid-template-columns:1fr">${[1, 2, 3].map(i => `<div class="caja" style="padding:8px 10px"><b>Electrodo ${i}</b> <span class="nota">${["a la derecha: la onda viene hacia él", "a la izquierda: la onda se aleja", "arriba: la onda pasa de costado"][i - 1]}</span>
+          <div id="dp-e${i}" style="font-weight:700;font-size:14.5px;min-height:21px"></div><canvas class="ecg" id="dp-c${i}" style="height:96px"></canvas></div>`).join("")}</div>
         <div class="caja"><p>En reposo la célula es <b>positiva por fuera</b>. Al activarse se vuelve <b>negativa por fuera</b>. En el borde entre las dos zonas hay un dipolo: <b>− detrás, + delante</b>, y su vector apunta hacia donde avanza la onda.</p>
         <ul><li>Si la onda <b>se acerca</b> al electrodo positivo → <b>deflexión positiva</b>.</li><li>Si <b>se aleja</b> → <b>negativa</b>.</li><li>Si pasa <b>perpendicular</b> → <b>bifásica</b> (isodifásica).</li></ul>
         <p class="nota">Al repolarizar, el dipolo se invierte (+ detrás). En esta tira aislada la T sale negativa en el electrodo 1; en el ventrículo real la T es positiva porque la repolarización avanza al revés (del epicardio al endocardio) y los dos signos se compensan.</p></div></div></div>
       <h2>2 · Cada derivación es una proyección del vector</h2>
       <div class="grid2"><div class="caja"><svg id="rueda" viewBox="-330 -330 660 660" style="width:100%;max-width:560px;display:block;margin:auto;touch-action:none"></svg>
         <p class="nota" style="text-align:center">Arrastra la flecha (el eje del QRS) · el lado <b>+</b> de cada derivación está marcado</p></div>
-      <div><div class="caja" id="eje-info"></div><div class="caja" style="padding:8px"><canvas class="ecg" id="eje-c"></canvas></div></div></div>
+      <div><div class="caja" id="eje-info"></div><div class="caja" style="padding:8px"><canvas class="ecg" id="eje-c" style="height:190px"></canvas></div></div></div>
       <h2>3 · El plano horizontal: de V1 a V6</h2>
       <div class="grid2"><div class="caja" style="padding:8px"><div class="lienzo" id="ch"><img src="img/corte.webp" alt="Corte transversal del tórax a nivel de los ventrículos">
         <svg class="sobre" viewBox="0 0 1536 1024"><g id="ch-rayos"></g><path id="ch-bucle" fill="none" stroke="#1E3A8A" stroke-width="7" stroke-linecap="round"/>
         <line id="ch-vec" stroke="#B91C1C" stroke-width="10" stroke-linecap="round"/><circle id="ch-punta" r="12" fill="#B91C1C"/></svg></div>
         <p class="nota">Corte visto desde los pies (como una tomografía): arriba el esternón, a tu derecha el lado izquierdo del paciente.</p></div>
       <div class="caja"><p>El vector del QRS empieza en el <b>septo</b> (hacia la derecha y adelante: la pequeña <b>r de V1</b> y la <b>q de V6</b>) y luego gira hacia el <b>ventrículo izquierdo</b>, grueso, atrás y a la izquierda: <b>S profunda en V1</b>, <b>R alta en V5-V6</b>. Entre medio está la transición (V3-V4, sobre el tabique).</p>
-        <canvas class="ecg" id="ch-c" style="height:150px"></canvas>
+        <canvas class="ecg" id="ch-c" style="height:200px"></canvas><p class="nota" style="margin:2px 0 0">El QRS está <b>ampliado en el tiempo</b> (unas 6 veces) para ver cómo se forma: en gris el complejo completo; el trazo y el punto rojo avanzan con el vector.</p>
         <div class="ctrl"><button class="btn sec" id="ch-p">⏸ Pausa</button><button class="btn sec" id="ch-s">Paso +5 ms ⏭</button>
           <label>Velocidad <input type="range" id="ch-v" min="0.1" max="2" step="0.05" value="1"></label><b id="ch-t"></b></div>
         <p class="nota">V1-V2 miran el ventrículo derecho · V3-V4 el tabique · V5-V6 el ventrículo izquierdo.</p></div></div>`;
 
     /* --- 1. dipolo --- */
-    const cvs = [1, 2, 3].map(i => $("#dp-c" + i)), ELS = [[1470, 500], [66, 500], [768, 150]];
-    const series = [[], [], []]; let modo = "dep", f = -0.15, corre = true;
-    function ajustaC() { cvs.forEach(c => { const d = Math.min(2, devicePixelRatio || 1); c.width = c.clientWidth * d; c.height = 70 * d; c.getContext("2d").setTransform(d, 0, 0, d, 0, 0); }); }
+    // Cada electrodo ve el dipolo del frente: V ∝ (dirección del frente · vector al electrodo) / distancia³, con un
+    // "radio" de suavizado para que no se dispare cerca del electrodo. Los electrodos laterales se calculan un poco por
+    // fuera de la tira (así el 1 ve la onda acercarse todo el tiempo y el 2 alejarse). La tira se dibuja contra la
+    // posición del frente: lo que está a la izquierda del cursor ya pasó, a la derecha todavía no.
+    const cvs = [1, 2, 3].map(i => $("#dp-c" + i)), ELS = [[1470, 500], [66, 500], [768, 150]], VIRT = [[2500, 500], [-964, 500], [768, 150]];
+    const NB = 260, H = 96, FMAX = 1.14, series = [[], [], []];   // el eje sigue un poco después del final: se ve volver a 0
+    let modo = "dep", f = -0.15, corre = true;
+    const crudo = (k, xf) => { const dx = VIRT[k][0] - xf, dy = VIRT[k][1] - 500, a = k === 2 ? 260 : 700; return dx / Math.pow(dx * dx + dy * dy + a * a, 1.5); };
+    const NORM = VIRT.map((_, k) => { let m = 0; for (let x = 0; x <= 1536; x += 8) m = Math.max(m, Math.abs(crudo(k, x))); return m; });
+    // el frente nace y se apaga en los bordes de la tira: la curva entra y sale suave de 0 (sin escalones)
+    const borde = xf => { const u = xf / 1536, r = Math.min(1, u / 0.07, (1 - u) / 0.07); return r <= 0 ? 0 : r * r * (3 - 2 * r); };
+    const potencial = (k, xf, signo) => signo * crudo(k, xf) / NORM[k] * borde(xf);   // −1 … +1
+    function ajustaC() { cvs.forEach(c => { const d = Math.min(2, devicePixelRatio || 1); c.width = c.clientWidth * d; c.height = H * d; c.getContext("2d").setTransform(d, 0, 0, d, 0, 0); }); }
     ajustaC(); U.alRedimensionar = ajustaC;
-    function potencial(el, xf, signo) { const dx = el[0] - xf, dy = el[1] - 500, r = Math.hypot(dx, dy); return signo * 4.2e5 * dx / (r * r * r) * 30; }
-    function dibujaSerie(c, s) {
-      const x = c.getContext("2d"), w = c.clientWidth, h = 70;
-      x.fillStyle = css("--papel-ecg"); x.fillRect(0, 0, w, h); x.strokeStyle = css("--linea-ecg"); x.lineWidth = 1;
-      for (let i = 0; i < w; i += 10) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke(); }
-      x.strokeStyle = css("--traza"); x.lineWidth = 2; x.beginPath();
-      s.forEach((v, i) => { const px = i / 300 * w, py = h / 2 - v * 26; i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.stroke();
+    function dibujaSerie(c, s, fAct) {
+      const x = c.getContext("2d"), w = c.clientWidth, y0 = H / 2, A = H * 0.4, X = b => 34 + b / NB * (w - 44);
+      x.fillStyle = css("--papel-ecg"); x.fillRect(0, 0, w, H); x.strokeStyle = css("--linea-ecg"); x.lineWidth = 1;
+      for (let i = 34; i < w; i += 10) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+      x.strokeStyle = css("--linea-ecg2"); x.beginPath(); x.moveTo(34, y0); x.lineTo(w, y0); x.stroke();
+      x.font = "700 13px Fredoka, Nunito, sans-serif"; x.fillStyle = css("--ve"); x.fillText("+", 14, y0 - A + 8); x.fillStyle = css("--ro"); x.fillText("−", 15, y0 + A); x.fillStyle = css("--tx2"); x.fillText("0", 14, y0 + 4);
+      // área bajo la curva: verde si es positiva, roja si es negativa
+      for (let b = 1; b < s.length; b++) {
+        const v = s[b]; if (v == null || s[b - 1] == null) continue;
+        x.fillStyle = v >= 0 ? "rgba(34,197,94,.28)" : "rgba(239,68,68,.28)"; x.fillRect(X(b - 1), Math.min(y0, y0 - v * A), X(b) - X(b - 1) + 0.5, Math.abs(v * A));
+      }
+      x.strokeStyle = css("--traza"); x.lineWidth = 2.4; x.lineJoin = "round"; x.beginPath(); let prim = true;
+      s.forEach((v, b) => { if (v == null) return; const px = X(b), py = y0 - v * A; prim ? x.moveTo(px, py) : x.lineTo(px, py); prim = false; }); x.stroke();
+      if (fAct > 0 && fAct < FMAX) {   // cursor: dónde va el frente ahora
+        const px = X(fAct / FMAX * NB); x.strokeStyle = css("--azc"); x.setLineDash([4, 4]); x.lineWidth = 1.5; x.beginPath(); x.moveTo(px, 0); x.lineTo(px, H); x.stroke(); x.setLineDash([]);
+        const v = s[Math.min(NB, Math.round(fAct / FMAX * NB))] || 0; x.fillStyle = css("--azc"); x.beginPath(); x.arc(px, y0 - v * A, 5, 0, 7); x.fill();
+      }
     }
     let pausaD = false, pendiente = 0;
     function cuadroDipolo() {
-      const inc = pausaD ? pendiente : (corre ? 0.006 * +$("#dp-v").value : 0); pendiente = 0;
-      const nMuestras = inc > 0 ? Math.max(1, Math.round(inc / 0.006)) : 0, fAnt = f;
+      const inc = pausaD ? pendiente : (corre ? 0.0042 * +$("#dp-v").value : 0); pendiente = 0;
       f += inc;
       const xf = Math.max(0, Math.min(1536, f * 1536)), act = f > 0 && f < 1, sg = modo === "dep" ? 1 : -1;
       $("#dp-act").setAttribute("width", modo === "dep" ? xf : 1536);
@@ -122,20 +171,25 @@
       $("#dp-vec").setAttribute("x1", xf - 110); $("#dp-vec").setAttribute("x2", xf + 110); $("#dp-vec").setAttribute("opacity", act ? 1 : 0);
       $("#dp-vec").setAttribute("transform", sg < 0 ? `rotate(180 ${xf} 250)` : "");
       $("#dp-carg").innerHTML = act ? [330, 690].map(y => `<text x="${xf - 70}" y="${y}" fill="${sg > 0 ? "#B91C1C" : "#1E3A8A"}">${sg > 0 ? "−" : "+"}</text><text x="${xf + 30}" y="${y}" fill="${sg > 0 ? "#1E3A8A" : "#B91C1C"}">${sg > 0 ? "+" : "−"}</text>`).join("") : "";
-      ELS.forEach((el, i) => {
-        for (let k = 1; k <= nMuestras; k++) {   // en un paso grande se agregan varias muestras para no deformar la curva
-          const fk = fAnt + (f - fAnt) * k / nMuestras, xk = Math.max(0, Math.min(1536, fk * 1536));
-          series[i].push(fk > 0 && fk < 1 ? potencial(el, xk, sg) : 0); if (series[i].length > 300) series[i].shift();
-        }
-        dibujaSerie(cvs[i], series[i]); });
+      // rayos del frente a cada electrodo, del color de lo que registra
+      $("#dp-rayos").innerHTML = act ? ELS.map((el, k) => { const v = potencial(k, xf, sg); return `<line x1="${xf}" y1="500" x2="${el[0]}" y2="${el[1]}" stroke="${v >= 0.05 ? "#16A34A" : v <= -0.05 ? "#DC2626" : "#64748B"}" opacity="${0.35 + 0.6 * Math.min(1, Math.abs(v))}"/>`; }).join("") : "";
+      ELS.forEach((el, k) => {
+        const s = series[k];
+        if (f > 0) { const b = Math.min(NB, Math.round(f / FMAX * NB)); for (let i = s.length; i <= b; i++) { const fi = i / NB * FMAX; s[i] = fi < 1 ? potencial(k, fi * 1536, sg) : 0; } }
+        dibujaSerie(cvs[k], s, f);
+        const v = act ? potencial(k, xf, sg) : 0, dir = act ? (k === 2 ? (xf < el[0] ? "se acerca" : "se aleja") : k === 0 ? "se acerca" : "se aleja") : "";
+        $("#dp-e" + (k + 1)).innerHTML = !act ? (f >= 1 ? `<span style="color:var(--tx2)">${modo === "dep" ? "Todo activado igual" : "Todo en reposo otra vez"} → no hay diferencia → <b>línea en 0</b></span>` : `<span style="color:var(--tx2)">Reposo: no hay frente → 0</span>`)
+          : `<span style="color:${v >= 0.05 ? "var(--ve)" : v <= -0.05 ? "var(--ro)" : "var(--tx2)"}">${sg > 0 ? "El + del dipolo" : "El frente de repolarización (− delante)"} ${dir} → ${v >= 0.05 ? "deflexión <b>positiva</b> ↑" : v <= -0.05 ? "deflexión <b>negativa</b> ↓" : "casi 0 (justo enfrente: cambia de signo)"}</span>`;
+      });
       $("#dp-est").textContent = !act ? (f >= 1 ? (modo === "dep" ? "Tira toda activada: no hay frente → línea isoeléctrica (como el ST)" : "Tira en reposo otra vez") : "En reposo: no hay frente, no hay corriente") : (modo === "dep" ? "Frente de despolarización avanzando →" : "Frente de repolarización avanzando →");
-      if (f > 1.25) corre = false;
+      if (f > FMAX + 0.02) corre = false;
       raf(cuadroDipolo);
     }
+    const reinicia = m => { modo = m; f = -0.06; corre = true; series.forEach(s => s.length = 0); };
     $("#dp-p").onclick = () => { pausaD = !pausaD; $("#dp-p").textContent = pausaD ? "▶ Seguir" : "⏸ Pausa"; };
-    $("#dp-s").onclick = () => { pausaD = true; $("#dp-p").textContent = "▶ Seguir"; if (!corre && f > 1.2) return; corre = true; pendiente = 0.05; };
-    $("#dp-dep").onclick = () => { modo = "dep"; f = -0.1; corre = true; series.forEach(s => s.length = 0); };
-    $("#dp-rep").onclick = () => { modo = "rep"; f = -0.1; corre = true; series.forEach(s => s.length = 0); };
+    $("#dp-s").onclick = () => { pausaD = true; $("#dp-p").textContent = "▶ Seguir"; if (!corre && f > 1.1) return; corre = true; pendiente = 0.04; };
+    $("#dp-dep").onclick = () => reinicia("dep");
+    $("#dp-rep").onclick = () => reinicia("rep");
     raf(cuadroDipolo);
 
     /* --- 2. rueda hexaxial --- */
@@ -171,10 +225,8 @@
         <p><b>Paso 1</b>: DI ${p.DI >= 0 ? "+" : "−"} y aVF ${p.aVF >= 0 ? "+" : "−"} → ${q}.<br><b>Paso 2</b>: la más isodifásica es <b>${iso}</b>; el eje es perpendicular a ella.</p>
         <p class="nota">Einthoven: DI + DIII = ${(p.DI + p.DIII).toFixed(1)} = DII (${p.DII.toFixed(1)}) · Wilson: aVR + aVL + aVF = ${(p.aVR + p.aVL + p.aVF).toFixed(1)}</p>`;
       // complejos de las 6 derivaciones frontales con el eje girado
-      const ecg = E.construir({ tipo: "normal", fc: 70, rotar: ang - 53 }, 3), cv = $("#eje-c");
-      const P = new U.Papel(cv, 30), mm = (cv.clientWidth - 4) / 160; P.mm = mm; P.H = 30 * mm; const d = P.dpr;
-      cv.width = cv.clientWidth * d; cv.height = P.H * d; cv.style.height = P.H + "px"; P.c.setTransform(d, 0, 0, d, 0, 0); P.W = cv.clientWidth; P.grilla();
-      FR.forEach((der, i) => { const x0 = 3 * mm + i * 26 * mm; P.trazo(ecg, der, 0.3, 1.25, x0, 19 * mm); P.texto(der, x0 + 2, 5 * mm); });
+      const ecg = E.construir({ tipo: "normal", fc: 70, rotar: ang - 53, amp: mag }, 3), l = ecg.latidos.find(x => x.tq != null);
+      U.columnas($("#eje-c"), ecg, FR, { t0: l.tp - 0.04, t1: l.tq + 0.42, base: 0.58, mvAlto: 0.3, alto: 190, rojas: ["DI", "aVF"] });
     }
     let arrastra = false;
     const mover = ev => { if (!arrastra) return; const b = R.getBoundingClientRect(), x = (ev.clientX - b.left) / b.width * 660 - 330, y = (ev.clientY - b.top) / b.height * 660 - 330;
@@ -206,11 +258,7 @@
       $("#ch-t").textContent = th <= 0.1 ? `QRS: ${Math.round(th * 1000)} ms` : "QRS terminado"; const t = Math.min(th, 0.1), p = aPant(vecEn(t));
       $("#ch-vec").setAttribute("x1", C0[0]); $("#ch-vec").setAttribute("y1", C0[1]); $("#ch-vec").setAttribute("x2", p[0]); $("#ch-vec").setAttribute("y2", p[1]);
       $("#ch-punta").setAttribute("cx", p[0]); $("#ch-punta").setAttribute("cy", p[1]);
-      const P = new U.Papel(cvh, 30), w = cvh.clientWidth, mm = (w - 4) / 156; P.mm = mm; P.H = 150; const d = P.dpr;
-      if (cvh.width !== Math.round(w * d)) { cvh.width = w * d; cvh.height = 150 * d; }
-      P.c.setTransform(d, 0, 0, d, 0, 0); P.W = w; P.grilla();
-      PREC.forEach((v, i) => { const x0 = 3 * mm + i * 26 * mm, y0 = 95;
-        P.trazo(ecgH, v, tq - 0.04, tq + Math.min(th, 0.12), x0, y0, null, 2); P.texto(v, x0 + 2, 18); });
+      U.columnas(cvh, ecgH, PREC, { t0: tq - 0.015, t1: tq + 0.115, hasta: tq + Math.min(th, 0.115), base: 0.55, mvAlto: 0.22, alto: 200 });
       raf(cuadroH);
     }
     raf(cuadroH);
@@ -275,8 +323,10 @@
     const ionesG = $("#iones"), part = [];
     for (let i = 0; i < 26; i++) { ionesG.insertAdjacentHTML("beforeend", `<circle r="13" opacity="0"/>`); part.push({ el: ionesG.lastChild, c: 0, y: 0, v: 0, vivo: false }); }
     function lanza(c) { const p = part.find(q => !q.vivo); if (!p || c.dir === 0 && Math.random() < 0.5) return;
-      const dir = c.dir || (Math.random() < 0.5 ? 1 : -1); p.vivo = true; p.c = c; p.x = c.x + (Math.random() - 0.5) * 30; p.y = dir > 0 ? 240 : 760; p.v = dir * (9 + Math.random() * 5);
-      p.el.setAttribute("fill", c.col); }
+      // la bomba Na⁺/K⁺ saca 3 Na⁺ (azules, hacia afuera) por cada 2 K⁺ que mete (morados, hacia adentro)
+      const naSale = c.dir === 0 && Math.random() < 0.6, dir = c.dir || (naSale ? -1 : 1);
+      p.vivo = true; p.c = c; p.x = c.x + (Math.random() - 0.5) * 30; p.y = dir > 0 ? 240 : 760; p.v = dir * (9 + Math.random() * 5);
+      p.el.setAttribute("fill", c.dir !== 0 ? c.col : naSale ? "#2563EB" : "#7C3AED"); }
     let ult = performance.now();
     function cuadro() {
       const now = performance.now();
@@ -333,7 +383,7 @@
       <div><div class="chips" id="dfr">${["DI", "DII", "DIII", "aVR", "aVL", "aVF"].map(d => `<button class="chip" data-d="${d}">${d}</button>`).join("")}</div>
         <div class="caja info" id="d-info"></div><div class="caja" style="padding:8px"><canvas class="ecg" id="d-c"></canvas></div>
         <div class="caja"><p><b>Einthoven</b>: DI, DII y DIII forman un triángulo equilátero cuyo centro es el centro eléctrico del corazón; se cumple <b>DI + DIII = DII</b>.<br>
-        <b>Wilson</b> unió los tres miembros con una resistencia: <b>aVR + aVL + aVF = 0</b>. Además DI = aVL − aVR · DII = aVF − aVR · DIII = aVF − aVL.</p></div></div></div>
+        <b>Wilson</b> unió los tres miembros con una resistencia: <b>aVR + aVL + aVF = 0</b>. Además DI = ⅔ (aVL − aVR) · DII = ⅔ (aVF − aVR) · DIII = ⅔ (aVF − aVL).</p></div></div></div>
       <h2>Plano horizontal: precordiales V1 a V6</h2>
       <div class="grid2"><div class="caja" style="padding:8px"><div class="lienzo"><img src="img/precordial.webp" alt="Pared anterior del tórax con costillas y corazón">
         <svg class="sobre" viewBox="0 0 1536 1024">${Object.entries(PRE).map(([v, [p]]) => `<g class="hit" data-v="${v}" transform="translate(${p[0]},${p[1]})"><circle r="30" class="marcador"/><text text-anchor="middle" dy="10" font-size="27" font-weight="800">${v}</text></g>`).join("")}</svg></div></div>
@@ -422,12 +472,15 @@
     const ZONAS = { P: [tp, tp + 0.1], PRi: [tp, tq], PRs: [tp + 0.1, tq], QRS: [tq, tq + 0.09], ST: [tq + 0.09, tq + qt - 0.17], T: [tq + qt - 0.17, tq + qt + 0.02], QT: [tq, tq + qt + 0.02], RR: [tq, L[2].tq] };
     let sel = 0;
     function pinta() {
-      const [n, txt, z, nb] = NUEVE[sel], seg = nb === 3 ? 2.6 : 1.1, t0 = nb === 3 ? L[0].tp - 0.05 : tp - 0.12;
-      const P = U.tira($("#lc"), ecg, "DII", seg, 34, { t0, ancho: 2.4 });
+      const [n, txt, z, nb] = NUEVE[sel], seg = nb === 3 ? 2.6 : 2.1, t0 = nb === 3 ? L[0].tp - 0.05 : tp - 0.55;
+      // alto fijo (~280 px) en todos los pasos: el lienzo ya no salta de tamaño al cambiar de paso
+      const cw = $("#lc").clientWidth || 500, mmPx = (cw - 4) / (seg * 25 + 6), alto = 280 / mmPx;
+      const P = U.tira($("#lc"), ecg, "DII", seg, alto, { t0, ancho: 2.4, base: alto * 0.62 });
       const X = s => P.x0 + (s - t0) * 25 * P.mm, [a, b] = ZONAS[z], c = P.c;
       c.fillStyle = "rgba(59,130,246,.18)"; c.fillRect(X(a), 0, X(b) - X(a), P.H);
       c.strokeStyle = "#2563EB"; c.lineWidth = 2; [a, b].forEach(s => { c.beginPath(); c.moveTo(X(s), 0); c.lineTo(X(s), P.H); c.stroke(); });
-      c.fillStyle = "#1E3A8A"; c.font = `700 ${Math.max(13, P.mm * 3)}px Fredoka`; c.fillText(`${(b - a).toFixed(2)} s`, (X(a) + X(b)) / 2 - 20, P.H - 8);
+      const rot = `${(b - a).toFixed(2)} s`; c.font = "700 15px Fredoka, Nunito, sans-serif"; const tw = c.measureText(rot).width, cx = Math.max(4, Math.min(P.W - tw - 14, (X(a) + X(b)) / 2 - tw / 2 - 5));
+      c.fillStyle = "#2563EB"; c.beginPath(); c.roundRect ? c.roundRect(cx, P.H - 30, tw + 10, 22, 8) : c.rect(cx, P.H - 30, tw + 10, 22); c.fill(); c.fillStyle = "#fff"; c.fillText(rot, cx + 5, P.H - 14);
       if (z === "ST") { c.fillStyle = "#B91C1C"; c.beginPath(); c.arc(X(a), P.y0, 6, 0, 7); c.fill(); c.fillText("J", X(a) + 8, P.y0 - 10); }
       $("#l-info").innerHTML = `<h3 style="margin-top:0">${sel + 1}. ${n}</h3><p>${txt}</p>`;
       $$("#nv li").forEach((li, i) => li.classList.toggle("act", i === sel));
@@ -440,7 +493,9 @@
      PATOLOGÍAS: 12 derivaciones de cada patrón
      ===================================================================== */
   const RESALTA = { had: ["DII", "DIII", "aVF", "V1"], hai: ["DII", "V1"], hvd: ["V1", "V6", "DI"], hvi: ["V1", "V5", "V6", "DI", "DIII"],
-    bcrd: ["V1", "V2", "DI", "V6"], bcri: ["DI", "aVL", "V5", "V6", "V1", "V2"], bav1: ["DII"], mobitz1: ["DII"], mobitz2: ["DII"], bav3: ["DII"], fa: ["DII", "V1"] };
+    bcrd: ["V1", "V2", "DI", "V6"], bcri: ["DI", "aVL", "V5", "V6", "V1", "V2"], bav1: ["DII"], mobitz1: ["DII"], mobitz2: ["DII"], bav3: ["DII"], fa: ["DII", "V1"],
+    flutter: ["DII", "DIII", "aVF", "V1"], esa: ["DII"], esv: ["DII", "V1", "V6"], bigem: ["DII"], tsv: ["DII"], tv: ["DII", "V1", "V6"], torsades: ["DII"],
+    fv: ["DII"], asistolia: ["DII"], wpw: ["DII", "V1", "V4", "V5", "V6"], pericarditis: ["DI", "DII", "aVF", "V2", "V3", "V4", "V5", "V6", "aVR"] };
   SECC.patologia = function (main, arg) {
     const grupos = {};
     Object.entries(E.PATRONES).forEach(([k, p]) => (grupos[p.grupo] = grupos[p.grupo] || []).push([k, p]));

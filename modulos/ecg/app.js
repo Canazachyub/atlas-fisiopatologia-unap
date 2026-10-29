@@ -97,7 +97,7 @@
     sa: [590, 248], av: [718, 372], his: [780, 432], escape: [800, 600],
     internodal: "M590,248 C628,292 690,330 718,372", bachmann: "M598,252 C700,238 820,272 905,330",
     hisP: "M718,372 L780,432",
-    rd: "M780,432 C786,520 792,610 795,700",
+    rd: "M780,432 C786,520 792,610 795,700", kent: "M1000,440 C1010,470 1016,500 1020,530",
     ri: "M786,436 C832,522 882,632 930,730 C950,770 975,795 1005,805",
     purkD: ["M795,640 C760,650 700,660 650,650", "M795,690 C760,720 720,752 690,782", "M797,700 C800,760 820,800 852,832"],
     purkI: ["M930,730 C980,720 1030,700 1062,690", "M962,772 C992,802 1020,830 1042,842", "M936,742 C930,800 942,852 962,902", "M902,652 C952,632 1002,604 1052,592"],
@@ -121,10 +121,10 @@
         <polygon id="h-vi" points="${GEO.LV}" fill="#ff2d20" opacity="0" filter="url(#${u}suave)"/>
         <g id="h-rep" opacity="0" filter="url(#${u}suave)"><polygon points="${GEO.RV}" fill="url(#${u}gR)"/><polygon points="${GEO.LV}" fill="url(#${u}gR)"/></g>
         <g id="h-vias" fill="none" stroke-linecap="round">
-          ${[["internodal", GEO.internodal], ["bachmann", GEO.bachmann], ["hisP", GEO.hisP], ["rd", GEO.rd], ["ri", GEO.ri]]
-            .map(([k, d]) => `<path id="h-${k}" d="${d}" stroke="#ffe066" stroke-width="9" opacity="0" filter="url(#${u}brillo)"/><path id="h-${k}2" d="${d}" stroke="#fff4b0" stroke-width="3.5" opacity="0"/>`).join("")}
-          ${GEO.purkD.map((d, i) => `<path class="h-pd" d="${d}" stroke="#ffe066" stroke-width="5" opacity="0" filter="url(#${u}brillo)"/>`).join("")}
-          ${GEO.purkI.map((d, i) => `<path class="h-pi" d="${d}" stroke="#ffe066" stroke-width="5" opacity="0" filter="url(#${u}brillo)"/>`).join("")}
+          ${[["internodal", GEO.internodal], ["bachmann", GEO.bachmann], ["hisP", GEO.hisP], ["rd", GEO.rd], ["ri", GEO.ri], ["kent", GEO.kent]]
+            .map(([k, d]) => `<path id="h-${k}" d="${d}" stroke="#ffe066" stroke-width="18" opacity="0" filter="url(#${u}brillo)"/><path id="h-${k}2" d="${d}" stroke="#fff4b0" stroke-width="6" opacity="0"/>`).join("")}
+          ${GEO.purkD.map((d, i) => `<path class="h-pd" d="${d}" stroke="#ffe066" stroke-width="9" opacity="0" filter="url(#${u}brillo)"/>`).join("")}
+          ${GEO.purkI.map((d, i) => `<path class="h-pi" d="${d}" stroke="#ffe066" stroke-width="9" opacity="0" filter="url(#${u}brillo)"/>`).join("")}
         </g>
         <circle id="h-sa" cx="${GEO.sa[0]}" cy="${GEO.sa[1]}" r="16" fill="#ffd60a" opacity=".25" filter="url(#${u}brillo)"/>
         <circle id="h-av" cx="${GEO.av[0]}" cy="${GEO.av[1]}" r="15" fill="#ff9f0a" opacity=".25" filter="url(#${u}brillo)"/>
@@ -138,7 +138,7 @@
           <text class="eti" x="250" y="650" fill="#7f1d1d">Ventrículo der.</text><text class="eti" x="1150" y="650" fill="#7f1d1d">Ventrículo izq.</text>`}</g>
       </svg></div>`;
     const S = cont.querySelector("svg"), g = id => S.querySelector("#" + id);
-    const paths = {}; ["internodal", "bachmann", "hisP", "rd", "ri"].forEach(k => paths[k] = g("h-" + k));
+    const paths = {}; ["internodal", "bachmann", "hisP", "rd", "ri", "kent"].forEach(k => paths[k] = g("h-" + k));
     const sparks = g("h-fa");
     for (let i = 0; i < 14; i++) sparks.insertAdjacentHTML("beforeend", `<circle r="20" fill="#ffd60a" opacity="0"/>`);
     const punto = g("h-punto"), X = g("h-x");
@@ -146,28 +146,34 @@
     const enPath = (k, f) => { const p = paths[k], L = p.getTotalLength(), q = p.getPointAtLength(L * Math.max(0, Math.min(1, f))); return [q.x, q.y]; };
     return function pintar(e, cfg) {
       const tipo = cfg.tipo;
-      g("h-sa").setAttribute("opacity", tipo === "fa" ? 0.15 : 0.25 + e.sa * 0.75); g("h-sa").setAttribute("r", 16 + e.sa * 10);
+      g("h-sa").setAttribute("opacity", ["fa", "flutter", "fv", "asistolia", "tv", "torsades"].includes(tipo) ? 0.12 : 0.25 + e.sa * 0.75); g("h-sa").setAttribute("r", 16 + e.sa * 10);
       S.querySelector("#" + u + "gA").setAttribute("r", e.aur ? 60 + (e.pOn ? e.aurFrente : 1) * 560 : 1);
       g("h-aur").setAttribute("opacity", tipo === "fa" ? 0 : e.aur * 0.6);
       ilum("internodal", e.pOn ? 1 : e.aur * 0.4); ilum("bachmann", e.pOn ? 0.9 : e.aur * 0.3);
       g("h-av").setAttribute("opacity", 0.25 + e.av * 0.75); g("h-av").setAttribute("r", 15 + e.av * 8);
       ilum("hisP", e.his || (e.ven && e.venFrente < 0.4) ? 1 : 0);
-      ilum("rd", e.rd); ilum("ri", e.ri);
+      ilum("rd", e.rd); ilum("ri", e.ri); ilum("kent", e.kent ? 1 : tipo === "wpw" ? 0.25 : 0);
       $$(".h-pd", S).forEach(p => p.setAttribute("opacity", tipo === "bcrd" ? 0 : e.purk * 0.9));
       $$(".h-pi", S).forEach(p => p.setAttribute("opacity", tipo === "bcri" || e.escape ? 0 : e.purk * 0.9));
-      g("h-vd").setAttribute("opacity", e.vd * 0.42); g("h-vi").setAttribute("opacity", e.vi * 0.42);
       S.querySelector("#" + u + "gR").setAttribute("r", e.rep ? 80 + e.rep * 640 : 1); g("h-rep").setAttribute("opacity", e.rep ? 0.45 * (1 - Math.max(0, e.rep - 0.7) / 0.3) : 0);
       g("h-esc").setAttribute("opacity", e.escape ? 0.95 : 0);
       // fibrilación: chispas al azar en las paredes auriculares
-      [...sparks.children].forEach(c => {
+      [...sparks.children].forEach((c, i) => {
         if (tipo === "fa" && Math.random() < 0.5) {
           const enDer = Math.random() < 0.5, x = enDer ? 540 + Math.random() * 170 : 880 + Math.random() * 160, y = 300 + Math.random() * 130;
-          c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("opacity", 0.3 + Math.random() * 0.5);
+          c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("opacity", 0.3 + Math.random() * 0.5); c.setAttribute("fill", "#ffd60a");
+        } else if (e.fv && Math.random() < 0.6) {   // fibrilación ventricular: chispas caóticas en los ventrículos
+          const x = 560 + Math.random() * 500, y = 520 + Math.random() * 330;
+          c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("opacity", 0.35 + Math.random() * 0.5); c.setAttribute("fill", "#ff453a");
+        } else if (e.flutter != null && i < 5) {   // flutter: un frente que gira en círculo dentro de la aurícula derecha
+          const a = 2 * Math.PI * (e.flutter - i * 0.035);
+          c.setAttribute("cx", 600 + 85 * Math.cos(a)); c.setAttribute("cy", 360 + 60 * Math.sin(a)); c.setAttribute("opacity", 0.85 - i * 0.15); c.setAttribute("fill", "#ffd60a");
         } else c.setAttribute("opacity", 0);
       });
+      g("h-vd").setAttribute("opacity", e.fv ? 0.15 + Math.random() * 0.2 : e.vd * 0.42); g("h-vi").setAttribute("opacity", e.fv ? 0.15 + Math.random() * 0.2 : e.vi * 0.42);
       // el punto blanco: el impulso viajando
       let pt = null;
-      if (tipo !== "fa" && e.pOn) pt = enPath("internodal", e.aurFrente * 1.1);
+      if (tipo !== "fa" && e.pOn && !e.pEct) pt = enPath("internodal", e.aurFrente * 1.1);
       else if (e.his && !e.escape) pt = GEO.his;
       punto.setAttribute("opacity", pt ? 1 : 0); if (pt) { punto.setAttribute("cx", pt[0]); punto.setAttribute("cy", pt[1]); }
       // la X roja: dónde se corta el impulso
@@ -202,7 +208,41 @@
     hai: { que: "La aurícula izquierda agrandada se activa tarde y más tiempo.", ecg: ["<b>P mitrale</b>: bimodal, <span class=dato>&gt; 0.12 s</span> en DII", "V1: componente terminal lento, &gt; 0.04 s y &gt; 1 mm"], causa: "Estenosis e insuficiencia mitral." },
     hvd: { que: "El VD hipertrofiado gana peso al vector del QRS (normalmente el VI tiene 3-4 veces más masa).", ecg: ["Eje a la derecha (&gt; +90°)", "V1: R &gt; S; V6: S &gt; R", "T invertida V1-V4", "Cabrera R/(R+S) en V1 &gt; 0.5"], causa: "Cor pulmonar crónico, hipertensión pulmonar; en la altura, por hipoxia crónica." },
     hvi: { que: "Más masa del VI: QRS de mayor voltaje, eje a la izquierda.", ecg: ["<b>Sokolow-Lyon</b>: S V1 + R V5/V6 <span class=dato>≥ 35 mm</span>", "R DI + S DIII ≥ 25 mm", "T invertida y asimétrica en V5-V6 (sobrecarga)", "Eje −30°"], causa: "Presión: HTA, estenosis aórtica. Volumen: insuficiencia mitral o aórtica." },
+    esa: { que: "Un foco de la aurícula, distinto del nódulo sinusal, dispara antes de tiempo. La P adelantada tiene otra forma y el QRS es normal, porque baja por la vía de siempre.", ecg: ["P <b>prematura y distinta</b> (aquí negativa en DII)", "QRS estrecho, igual a los demás", "Pausa <b>no compensadora</b>: el foco reinicia al nódulo sinusal"], causa: "Café, tabaco, alcohol, estrés, cardiopatías con aurícula dilatada. Casi siempre benignas. <span class=lit>literatura</span>" },
+    esv: { que: "Un foco del ventrículo dispara antes del latido sinusal. El impulso no usa el His-Purkinje: viaja lento por el músculo, por eso el QRS es <b>ancho y raro</b>.", ecg: ["QRS <b>adelantado, ancho (&gt; 0.12 s) y sin P</b> delante", "T <b>opuesta</b> al QRS", "Pausa <b>compensadora completa</b>: la P sinusal siguiente queda escondida"], causa: "Docente: aparecen en la hipopotasemia y tras el infarto, donde pueden pasar a taquicardia ventricular y fibrilación. También café, estrés, digitálicos." },
+    bigem: { que: "Cada latido sinusal va seguido de una extrasístole ventricular: <b>normal-extrasístole, normal-extrasístole</b>. Al tomar el pulso se nota el <b>pulso bigeminado</b>.", ecg: ["Alternan un QRS normal y uno ancho adelantado", "Pausa compensadora después de cada extrasístole"], causa: "Típico de la intoxicación digitálica y de la hipopotasemia. <span class=lit>literatura</span>" },
+    flutter: { que: "Un circuito de reentrada gira en la aurícula derecha a unos <span class=dato>300 por minuto</span>. El nódulo AV no deja pasar todos: conduce 2:1, 3:1 o 4:1.", ecg: ["Ondas <b>F en diente de sierra</b>, sin línea de base, mejor vistas en DII, DIII y aVF", "QRS estrecho y regular", "FC ventricular = 300 ÷ conducción (2:1 → 150, 4:1 → 75)"], causa: "Cardiopatías con aurícula dilatada, EPOC, posoperatorio cardiaco. Una FC fija de 150 debe hacer pensar en flutter 2:1. <span class=lit>literatura</span>" },
+    tsv: { que: "Un circuito de reentrada en el nódulo AV (o por una vía accesoria) dispara de golpe: empieza y termina bruscamente (paroxística).", ecg: ["FC <span class=dato>150-250 lpm</span>, muy regular", "QRS <b>estrecho</b>", "P escondida dentro del QRS o justo después"], causa: "Jóvenes sin cardiopatía; palpitaciones súbitas. Maniobras vagales (Valsalva, masaje carotídeo) o adenosina la cortan. <span class=lit>literatura</span>" },
+    tv: { que: "Un foco ventricular dispara en salvas: tres o más extrasístoles ventriculares seguidas. Los ventrículos laten rápido y llenan mal.", ecg: ["FC <span class=dato>&gt; 100 lpm</span> (aquí 170), regular", "QRS <b>ancho y monomorfo</b>", "Disociación AV: P sueltas que no se relacionan con el QRS"], causa: "Docente: tras el infarto las extrasístoles ventriculares pueden pasar a taquicardia ventricular y de ahí a fibrilación (muerte en 24-48 h). También hipopotasemia y cardiopatías dilatadas." },
+    torsades: { que: "Taquicardia ventricular <b>polimorfa</b>: el eje del QRS gira y la amplitud crece y decrece, como si el trazado se retorciera sobre la línea de base.", ecg: ["QRS ancho cuya amplitud y polaridad cambian cada pocos latidos", "Aparece sobre un <b>QT largo</b>"], causa: "QT largo: hipopotasemia, hipomagnesemia, hipocalcemia, fármacos (antiarrítmicos, macrólidos). Se trata con sulfato de magnesio. <span class=lit>literatura</span>" },
+    fv: { que: "Miles de focos ventriculares descargan en caos: el ventrículo <b>tiembla y no bombea</b>. No hay pulso: es un <b>paro cardiaco</b>.", ecg: ["Ondas <b>irregulares y caóticas</b>, sin P, QRS ni T", "No se puede medir FC"], causa: "Docente: infarto (arritmias, la principal causa de muerte precoz), hiperpotasemia grave (riesgo con K &gt; 9 mEq/L). Tratamiento: desfibrilación inmediata." },
+    asistolia: { que: "No hay actividad eléctrica: el corazón está parado. Es la forma más grave de paro cardiaco.", ecg: ["Línea casi plana", "Comprobar en dos derivaciones y que los electrodos estén bien puestos"], causa: "Docente: la hiperpotasemia aguda severa puede terminar en paro (asistolia). No se desfibrila: RCP y adrenalina. <span class=lit>literatura</span>" },
+    wpw: { que: "Existe un <b>haz de Kent</b>, una vía accesoria que une aurícula y ventrículo saltándose el nódulo AV. Parte del ventrículo se activa antes (preexcitación).", ecg: ["PR <b>corto</b> (&lt; 0.12 s)", "<b>Onda delta</b>: empastamiento inicial del QRS", "QRS ancho (≈ 0.12 s)"], causa: "Predispone a taquicardias por reentrada; con fibrilación auricular puede ser peligroso. <span class=lit>literatura</span>" },
+    pericarditis: { que: "La inflamación del pericardio irrita el epicardio de <b>todo</b> el corazón, no de un territorio: por eso el ST sube en casi todas las derivaciones.", ecg: ["ST supradesnivelado <b>cóncavo y difuso</b> (todas menos aVR y V1)", "<b>PR descendido</b>", "Sin onda Q ni imagen en espejo (eso la distingue del infarto)"], causa: "Virus, posinfarto, uremia, tuberculosis. Dolor que mejora al sentarse e inclinarse hacia adelante. <span class=lit>literatura</span>" },
     iam: { que: "Una coronaria se ocluye: el territorio pasa por <b>isquemia</b> (onda T) → <b>lesión</b> (ST) → <b>necrosis</b> (onda Q). Las derivaciones que miran la zona muestran el cambio; las opuestas, la imagen en espejo.", ecg: ["Isquemia → T · Lesión → ST · Necrosis → Q", "La Q persiste para siempre", "Isquemia y lesión son reversibles"] }
+  };
+
+  /* ---------- sonido del monitor (sintetizado, sin archivos) ---------- */
+  let ac = null;
+  U.audio = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch (e) {} return ac; };
+  U.pitido = (f = 880, dur = 0.07) => {
+    const c = U.audio(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+    o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  };
+  /* ---------- qué le pasa al ECG con el potasio y el calcio ---------- */
+  U.textoElectro = function (K, Ca) {
+    const p = [];
+    if (K >= 8.5) p.push(`<b>K ${K.toFixed(1)}: hiperpotasemia gravísima.</b> El QRS se ensancha tanto que se funde con la T en una <b>onda sinusoidal</b>; inminente fibrilación ventricular o asistolia (docente: riesgo de FV con K &gt; 9).`);
+    else if (K >= 7) p.push(`<b>K ${K.toFixed(1)}: hiperpotasemia grave.</b> Docente: <b>P aplanada</b>, <b>QRS ancho</b> y T picuda; luego complejos ventriculares y arritmias.`);
+    else if (K >= 6.5) p.push(`<b>K ${K.toFixed(1)}: hiperpotasemia moderada.</b> T alta y picuda; la P empieza a aplanarse y el PR se alarga.`);
+    else if (K > 5.5) p.push(`<b>K ${K.toFixed(1)}: hiperpotasemia leve.</b> Docente: onda <b>T alta, picuda y simétrica</b> (en tienda de campaña).`);
+    else if (K < 2.5) p.push(`<b>K ${K.toFixed(1)}: hipopotasemia grave.</b> T casi plana, <b>onda U grande</b> (puede parecer un QT largo), ST descendido; riesgo de extrasístoles, TV y torsades.`);
+    else if (K < 3.5) p.push(`<b>K ${K.toFixed(1)}: hipopotasemia.</b> Docente: <b>P y T aplanadas</b>, aparece la <b>onda U</b>, extrasístoles.`);
+    if (Ca < 8.5) p.push(`<b>Ca ${Ca.toFixed(1)}: hipocalcemia.</b> El <b>ST se alarga</b> → QT largo. <span class=lit>literatura</span>`);
+    else if (Ca > 10.5) p.push(`<b>Ca ${Ca.toFixed(1)}: hipercalcemia.</b> El ST se acorta → <b>QT corto</b>. <span class=lit>literatura</span>`);
+    return p.map(x => `<p style="margin:4px 0">🧪 ${x}</p>`).join("");
   };
 
   /* ---------- simulador ---------- */
@@ -233,27 +273,35 @@
         <div class="ctrl"><label id="fc-l">FC <input type="range" id="fc" min="30" max="180" step="1"> <b id="fc-v"></b> lpm</label>
           <label>Derivación <select id="der">${E.LISTA12.map(d => `<option>${d}</option>`).join("")}</select></label>
 </div>
+        <div class="ctrl"><label title="Potasio sérico">K⁺ <input type="range" id="k" min="1.5" max="9.5" step="0.1"> <b id="k-v"></b> mEq/L</label>
+          <label title="Calcio sérico">Ca²⁺ <input type="range" id="ca" min="6" max="14" step="0.1"> <b id="ca-v"></b> mg/dL</label>
+          <button class="chip" id="elec-0" title="Volver a K 4.2 y Ca 9.5">↺ Normales</button>
+          <button class="chip" id="sonido" title="Pitido del monitor en cada QRS">🔇 Sonido</button></div>
       </div>
       <div class="caja info" id="explica"></div></div></div>`;
-    const st = { tipo: "normal", fc: 75, vel: 0.25, der: "DII", region: "anteroseptal", fase: "les_epi", pausa: false };
+    const st = { tipo: "normal", fc: 75, vel: 0.25, der: "DII", region: "anteroseptal", fase: "les_epi", pausa: false, k: 4.2, ca: 9.5, sonido: false };
     try { Object.assign(st, JSON.parse(sessionStorage.getItem("ecg-sim") || "{}")); } catch (e) {}
     const pintar = U.corazon($("#corazon"));
     const cv = $("#monitor"); let P = new Papel(cv, 34);
     let ecg, T = 0, tEcg = 0, xPrev = 0, ultimo = performance.now();
     const ventana = () => P.W / P.mm / 25;  // segundos que caben en el monitor
     function armar() {
-      const cfg = { tipo: st.tipo, fc: st.fc, region: st.region, fase: st.fase, semilla: 1 + Math.floor(Math.random() * 1e6) };
+      const cfg = { tipo: st.tipo, fc: st.fc, region: st.region, fase: st.fase, k: st.k, ca: st.ca, semilla: 1 + Math.floor(Math.random() * 1e6) };
       ecg = E.construir(cfg, 600); tEcg = 0; T = 0; BORDES = etapas();
       try { sessionStorage.setItem("ecg-sim", JSON.stringify(st)); } catch (e) {}
       $$("[data-tipo]").forEach(b => b.classList.toggle("act", b.dataset.tipo === st.tipo));
       pintaVel();
       $("#iam-opc").style.display = st.tipo === "iam" ? "" : "none";
-      const pat = E.PATRONES[st.tipo], fcLibre = ["normal", "taqui", "bradi", "fa", "bav3"].includes(st.tipo);
+      const pat = E.PATRONES[st.tipo], fcLibre = ["normal", "taqui", "bradi", "fa", "bav3", "flutter", "tsv", "tv", "torsades", "esa", "esv", "bigem", "wpw", "pericarditis", "bav1"].includes(st.tipo);
       $("#fc-l").style.opacity = fcLibre ? 1 : .45; $("#fc").disabled = !fcLibre; $("#fc").value = st.fc; $("#fc-v").textContent = st.fc;
       $("#der").value = st.der; $("#iam-reg").value = st.region; $("#iam-fase").value = st.fase;
+      $("#k").value = st.k; $("#k-v").textContent = st.k.toFixed(1); $("#ca").value = st.ca; $("#ca-v").textContent = st.ca.toFixed(1);
+      $("#sonido").textContent = st.sonido ? "🔊 Sonido" : "🔇 Sonido"; $("#sonido").classList.toggle("act", st.sonido);
       const tx = U.TEXTOS[st.tipo] || {};
       let extra = "";
-      if (st.tipo === "iam") { const R = E.REGIONES[st.region]; extra = `<p><b>${E.FASES[st.fase]}</b>.<br>Lo ven: <b>${R.ve.join(", ")}</b> · espejo en ${R.espejo.join(", ")}.</p>`; }
+      if (st.tipo === "iam") { const R = E.REGIONES[st.region]; extra = `<p><b>${E.FASES[st.fase]}</b>.<br>Lo ven: <b>${R.ve.join(", ")}</b> · espejo en ${R.espejo.join(", ")} · arteria: ${R.arteria}.</p>`; }
+      if (st.tipo === "flutter") extra += `<p>Conducción actual: <b>${ecg.cfg.cond}:1</b> → FC ventricular ≈ ${Math.round(300 / ecg.cfg.cond)} lpm (mueve la FC para cambiarla).</p>`;
+      const el = U.textoElectro(st.k, st.ca); if (el) extra += `<div class="caja" style="margin:8px 0;background:color-mix(in srgb,var(--am) 14%,var(--papel))">${el}</div>`;
       $("#explica").innerHTML = `<h3 style="margin-top:0">${pat.nombre}</h3><p>${tx.que || ""}</p>${extra}<ul>${(tx.ecg || []).map(x => `<li>${x}</li>`).join("")}</ul>${tx.causa ? `<p class="nota">${tx.causa}</p>` : ""}`;
       $("#ver12").href = "#patologia/" + st.tipo;
     }
@@ -275,12 +323,17 @@
     $("#iam-reg").onchange = ev => { st.region = ev.target.value; armar(); inicio(); };
     $("#iam-fase").onchange = ev => { st.fase = ev.target.value; armar(); inicio(); };
     $("#pausa").onclick = () => { st.pausa = !st.pausa; pintaPausa(); };
+    $("#k").oninput = ev => { st.k = +ev.target.value; $("#k-v").textContent = st.k.toFixed(1); };
+    $("#ca").oninput = ev => { st.ca = +ev.target.value; $("#ca-v").textContent = st.ca.toFixed(1); };
+    $("#k").onchange = $("#ca").onchange = () => { armar(); inicio(); };
+    $("#elec-0").onclick = () => { st.k = 4.2; st.ca = 9.5; armar(); inicio(); };
+    $("#sonido").onclick = () => { st.sonido = !st.sonido; U.audio(); armar(); };
     /* --- paso a paso: las etapas del ciclo son los bordes de cada onda --- */
     function etapas() {
       const b = [];
       for (const l of ecg.latidos) {
-        const m = l._m || (l._m = E.morfo(ecg.cfg, l)), qt = Math.min(0.46, Math.max(0.3, 0.4 * Math.sqrt(l.rr || 0.8)));
-        if (l.tp != null && ecg.cfg.tipo !== "fa") b.push(l.tp, l.tp + 0.105);
+        const m = l._m || (l._m = E.morfo(ecg.cfg, l, ecg.el)), qt = E.qt(l, m);
+        if (l.tp != null && !["fa", "flutter"].includes(ecg.cfg.tipo)) b.push(l.tp, l.tp + 0.105);
         if (l.tq != null) b.push(l.tq, l.tq + m.qrsDur, l.tq + qt - 0.17, l.tq + qt + 0.02);
       }
       return b.sort((x, y) => x - y);
@@ -340,6 +393,10 @@
       if (!st.pausa) {
         const t0 = tEcg; tEcg += dt * st.vel; T += dt * st.vel;
         dibujar(t0, tEcg);
+        if (st.sonido) {
+          for (const l of ecg.latidos) { if (l.tq == null || l.tq <= t0) continue; if (l.tq > tEcg) break; U.pitido(l.ectopico ? 660 : 880); }
+          if (["fv", "asistolia", "tv", "torsades"].includes(st.tipo) && Math.floor(tEcg / 1.2) !== Math.floor(t0 / 1.2)) U.pitido(st.tipo === "asistolia" ? 520 : 1250, 0.28);
+        }
         if (tEcg > ecg.dur - 2) { armar(); inicio(); }
       }
       pintar(E.estado(ecg, tEcg), ecg.cfg);
@@ -358,7 +415,7 @@
     $$("#tabs a").forEach(a => a.classList.toggle("act", a.getAttribute("href") === "#" + (SECC[id] ? id : "sim")));
     const act = $("#tabs a.act"); if (act) act.scrollIntoView({ block: "nearest", inline: "center" });
     vista.innerHTML = ""; f(vista, arg); window.scrollTo(0, 0);
-    vista.insertAdjacentHTML("beforeend", `<p class="pie">Módulo compartido con el Atlas de Semiología: contenido de Sotomayor, <i>Semiología General</i>, tema 8 (2020), que coincide con las clases 18-24 de Fisiopatología (EKG, eje, hipertrofias, bloqueos, bradicardia e infarto).
+    vista.insertAdjacentHTML("beforeend", `<p class="pie">Módulo compartido con el Atlas de Semiología: contenido de Sotomayor, <i>Semiología General</i>, tema 8 (2020), que coincide con las clases 18-24 de Fisiopatología (EKG, eje, hipertrofias, bloqueos, bradicardia e infarto); potasio y calcio según la clase 7.
       Lo marcado <span class="lit">literatura</span> viene de la fisiología general, no de la clase. Ilustraciones generadas con ChatGPT; el trazado es una simulación didáctica.</p>`);
   }
   addEventListener("hashchange", ruta);
