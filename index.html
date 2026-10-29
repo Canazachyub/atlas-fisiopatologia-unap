@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas del banco · Semiología</title>
+<meta name="theme-color" content="#1d4f63">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono-192.png">
+<link rel="apple-touch-icon" href="icono-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Atlas Semio">
+<link rel="stylesheet" href="fonts.css?v=20261029032700">
+<link rel="stylesheet" href="app.css?v=20261029032700">
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="#/">🩺 <b>Atlas del banco</b> <span>Semiología · temas 1 a 13</span></a>
+  <nav>
+    <a href="#/" data-nav="inicio">Láminas</a>
+    <a href="#/repaso" data-nav="repaso">🔥 Repaso</a>
+    <button id="tema-btn" title="Cambiar tema claro u oscuro">🌓</button>
+  </nav>
+</header>
+<main id="vista"></main>
+<div id="toast" role="status"></div>
+<script src="datos.js?v=20261029032700"></script>
+<script src="app.js?v=20261029032700"></script>
+<script>
+// sin internet: el service worker guarda el atlas completo la primera vez que se abre con conexión
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  addEventListener("load", () => {
+    const aviso = () => { const t = document.getElementById("toast"); t.textContent = "📥 Atlas guardado completo: ya funciona sin internet"; t.className = "bien ver"; setTimeout(() => t.classList.remove("ver"), 3500); };
+    navigator.serviceWorker.addEventListener("message", ev => { if (ev.data === "atlas-completo") aviso(); });
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // las láminas grandes se guardan después de que la página ya se ve (y se completan si faltara alguna)
+    navigator.serviceWorker.ready.then(reg => setTimeout(() => reg.active && reg.active.postMessage("guardar-resto"), 1500));
+  });
+}
+</script>
+</body>
+</html>

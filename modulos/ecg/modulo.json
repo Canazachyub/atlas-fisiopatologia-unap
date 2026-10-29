@@ -1,0 +1,8 @@
+{
+ "titulo": "ECG interactivo",
+ "icono": "🫀",
+ "descripcion": "Simulador del corazón y su electrocardiograma: anatomía del sistema de conducción, física del dipolo y las derivaciones, potencial de acción, papel y FC, lectura en 9 pasos, 16 patologías en 12 derivaciones y autoevaluación.",
+ "mini": "img/corazon.webp",
+ "laminas": [15, 16, 17, 18],
+ "enlace_lamina": "🫀 Simulador ECG"
+}
