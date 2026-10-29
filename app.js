@@ -348,11 +348,134 @@
   }
 
   /* ---------- lámina ---------- */
+  /* ---------- «Entiéndelo»: prelectura, bloques ACERO, 4 piezas, Feynman, guía de preguntas, comprensiómetro ---------- */
+  const PIEZA = { que: "¿Qué es?", como: "¿Cómo ocurre?", porque: "¿Por qué importa?", paraque: "¿Para qué sirve saberlo?" };
+  const TIPO_G = { directa: "", inversa: "↩️ al revés", caso: "🩺 caso" };
+  function entenderHTML(l) {
+    const x = l.entender, comp = (P.comp || {})[l.n] || 0;
+    return `<h2 id="entender">📖 Entiéndelo <small style="font-size:14px;color:var(--tx2);font-weight:500">léelo antes de memorizar: primero el porqué</small></h2>
+      <div class="ent-pre"><div class="ent-pre-t">🧭 Antes de leer</div>
+        ${x.objetivo ? `<p><b>Cómo te lo preguntan:</b> ${x.objetivo}</p>` : ""}${x.trata ? `<p><b>De qué trata:</b> ${x.trata}</p>` : ""}
+        ${x.divide.length ? `<div class="ent-div"><b>Cómo se divide:</b> ${x.divide.map((d, k) => `<a href="#" data-b="${k}"><i>${k + 1}</i>${d}</a>`).join("")}</div>` : ""}</div>
+      <div class="ent-bloques">${x.bloques.map((b, k) => `<article class="ent-b" id="ent-b${k}"><div class="ent-t">${b.t}</div>
+        ${b.q ? `<div class="ent-q">${b.q}</div>` : ""}${b.txt.map(p => `<p>${p}</p>`).join("")}
+        ${b.ej ? `<div class="ent-ej">💡 ${b.ej}</div>` : ""}${b.ojo ? `<div class="ent-ojo">⚠️ ${b.ojo}</div>` : ""}</article>`).join("")}</div>
+      ${x.piezas.length ? `<div class="ent-piezas"><div class="ent-pre-t">⏱️ En 30 segundos</div><div class="ent-pz">${x.piezas.map(([k, v]) => `<div><b>${PIEZA[k]}</b>${v}</div>`).join("")}</div></div>` : ""}
+      ${x.feynman ? `<div class="ent-fey"><div class="ent-pre-t">👵 Explícaselo a tu abuela</div><p>${x.feynman}</p></div>` : ""}
+      ${x.guia.length ? `<div class="ent-guia"><div class="ent-pre-t">❓ Guía de preguntas <small>respóndelas en voz alta, sin mirar; luego destapa</small></div>
+        ${x.guia.map(g => `<div class="ent-g"><div class="ent-gq">${g.q}${TIPO_G[g.tipo] ? ` <span class="ent-tipo">${TIPO_G[g.tipo]}</span>` : ""}</div>
+          <button class="btn chico sec ent-ver">Ver respuesta</button><div class="ent-gr" hidden>${g.r}</div></div>`).join("")}</div>` : ""}
+      <div class="ent-comp"><div class="ent-pre-t">🌡️ Comprensiómetro <small>¿cuánto lo entiendes, del 1 al 10? Explícalo sin mirar y sé honesto</small></div>
+        <div class="ent-esc">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => `<button data-v="${v}" class="${v <= comp ? "on" : ""}">${v}</button>`).join("")}</div>
+        <div class="ent-msg" id="ent-msg">${compMsg(comp)}</div></div>`;
+  }
+  function compMsg(v) {
+    if (!v) return "";
+    if (v >= 10) return "✅ Ya lo puedes explicar. Pasa a 🧠 Cómo recordarlo y a las preguntas.";
+    if (v >= 7) return "Casi: con 9 todavía hay ilusión de saber. Explica en voz alta el bloque que más te costó y vuelve a puntuar.";
+    return "Vuelve a los bloques, lee solo lo que no supiste explicar y mira el esquema; luego explícalo otra vez.";
+  }
+  function montarEntender(l) {
+    $$(".ent-div a").forEach(a => a.onclick = ev => { ev.preventDefault(); SON.tick(); const b = document.getElementById("ent-b" + a.dataset.b);
+      if (b) { b.scrollIntoView({ behavior: "smooth", block: "center" }); b.classList.remove("brilla"); void b.offsetWidth; b.classList.add("brilla"); } });
+    $$(".ent-ver").forEach(b => b.onclick = () => { SON.tick(); const r = b.nextElementSibling; r.hidden = !r.hidden; b.textContent = r.hidden ? "Ver respuesta" : "Ocultar"; });
+    $$(".ent-esc button").forEach(b => b.onclick = () => { SON.tick(); const v = +b.dataset.v; P.comp = P.comp || {}; P.comp[l.n] = v; guardar(P);
+      $$(".ent-esc button").forEach(x => x.classList.toggle("on", +x.dataset.v <= v)); $("#ent-msg").innerHTML = compMsg(v); if (v >= 10) chispas(b); });
+  }
+  /* ---------- esquema draw.io del tema completo (imagen con zoom + PDF vectorial) ---------- */
+  function esquemaHTML(l) {
+    const x = l.esquema;
+    return `<h2 id="esquema">🗺️ Esquema del tema <small style="font-size:14px;color:var(--tx2);font-weight:500">todo el razonamiento en un mapa; tócalo para ampliarlo</small></h2>
+      <div class="esq-cab"><span class="esq-ley"><i class="k-causa"></i>causa <i class="k-mec"></i>mecanismo <i class="k-sig"></i>síntoma o signo <i class="k-dx"></i>diagnóstico <i class="k-comp"></i>complicación <i class="k-des"></i>desenlace · borde dorado = alto rendimiento · <b class="esq-f">F#</b> = pregunta n.º # de esta lámina</span>
+        ${x.pdf ? `<a class="btn chico sec" href="${x.pdf}" target="_blank" rel="noopener">📄 PDF para imprimir</a>` : ""}</div>
+      <div class="esq-marco" id="esq-marco"><img src="${x.img}" alt="Esquema: ${x.titulo}" loading="lazy"><span class="esq-abrir">⤢ Abrir y ampliar</span></div>
+      ${x.fc.length ? `<div class="esq-fc">Preguntas que responde el esquema: ${x.fc.map(n => `<a href="#/l/${l.n}/q${n}">${n}</a>`).join("")}</div>` : ""}`;
+  }
+  function montarEsquema(l) {
+    $("#esq-marco").onclick = () => abrirVisor(l.esquema.img, l.esquema.titulo);
+  }
+  // visor a pantalla completa: arrastrar = mover · pellizcar / rueda / ± = zoom · doble toque = ampliar ahí · Esc o ✕ = cerrar
+  function abrirVisor(src, titulo) {
+    SON.tick();
+    const ov = document.createElement("div"); ov.className = "vis";
+    ov.innerHTML = `<div class="vis-lienzo"><img src="${src}" alt="" draggable="false"></div>
+      <div class="vis-top"><span class="vis-tit">${titulo || ""}</span><button class="vis-b" data-a="x" title="Cerrar (Esc)">✕</button></div>
+      <div class="vis-ctl"><button class="vis-b" data-a="-" title="Alejar (−)">−</button><span class="vis-pct" id="vis-pct">100%</span>
+        <button class="vis-b" data-a="+" title="Acercar (+)">+</button><button class="vis-b" data-a="0" title="Ver todo (0)">⤢</button>
+        ${document.fullscreenEnabled ? `<button class="vis-b" data-a="f" title="Pantalla completa">⛶</button>` : ""}</div>
+      <canvas class="vis-mapa" width="150" height="100"></canvas>
+      <div class="vis-ayuda">Arrastra para moverte · pellizca o usa la rueda para el zoom · doble toque para ampliar</div>`;
+    document.body.appendChild(ov); document.body.style.overflow = document.documentElement.style.overflow = "hidden";
+    const lz = ov.querySelector(".vis-lienzo"), img = lz.querySelector("img"), mapa = ov.querySelector(".vis-mapa"), cx = mapa.getContext("2d");
+    let s = 1, x = 0, y = 0, base = 1, W = 0, H = 0;
+    const MAXZ = 8;
+    const limitar = () => {   // el dibujo nunca se escapa de la pantalla: si es más chico que ella, queda centrado
+      const vw = lz.clientWidth, vh = lz.clientHeight, w = W * s, h = H * s;
+      x = w <= vw ? (vw - w) / 2 : Math.min(0, Math.max(vw - w, x));
+      y = h <= vh ? (vh - h) / 2 : Math.min(0, Math.max(vh - h, y));
+    };
+    const pintar = () => {
+      limitar(); img.style.transform = `translate(${x}px,${y}px) scale(${s})`;
+      $("#vis-pct").textContent = Math.round(s / base * 100) + "%";
+      // minimapa: el rectángulo rojo es la parte que estás viendo
+      const k = Math.min(mapa.width / W, mapa.height / H), mw = W * k, mh = H * k, ox = (mapa.width - mw) / 2, oy = (mapa.height - mh) / 2;
+      cx.clearRect(0, 0, mapa.width, mapa.height); cx.drawImage(img, ox, oy, mw, mh);
+      const vx = -x / s * k, vy = -y / s * k, vw = lz.clientWidth / s * k, vh = lz.clientHeight / s * k;
+      cx.strokeStyle = "#e91e63"; cx.lineWidth = 2; cx.strokeRect(ox + Math.max(0, vx), oy + Math.max(0, vy), Math.min(mw, vw), Math.min(mh, vh));
+      mapa.hidden = s <= base * 1.05;
+    };
+    const zoomEn = (ns, px, py) => {   // zoom manteniendo fijo el punto (px, py) de la pantalla
+      ns = Math.min(base * MAXZ, Math.max(base, ns));
+      x = px - (px - x) * ns / s; y = py - (py - y) * ns / s; s = ns; pintar();
+    };
+    const ajustar = () => { base = Math.min(lz.clientWidth / W, lz.clientHeight / H); s = base; x = y = 0; pintar(); };
+    const centro = () => [lz.clientWidth / 2, lz.clientHeight / 2];
+    const iniciar = () => { W = img.naturalWidth; H = img.naturalHeight; ajustar(); };
+    if (img.complete && img.naturalWidth) iniciar(); else img.onload = iniciar;
+    // gestos con punteros: un dedo o el ratón arrastran, dos dedos pellizcan
+    const ptr = new Map(); let pinch = null, ult = 0, mov = false;
+    lz.addEventListener("pointerdown", ev => { try { lz.setPointerCapture(ev.pointerId); } catch (e) {} ptr.set(ev.pointerId, [ev.clientX, ev.clientY]); mov = false;
+      if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s }; }
+      ov.querySelector(".vis-ayuda").classList.add("fuera"); });
+    lz.addEventListener("pointermove", ev => {
+      if (!ptr.has(ev.pointerId)) return;
+      const [px, py] = ptr.get(ev.pointerId); ptr.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      const r = lz.getBoundingClientRect();
+      if (ptr.size === 2 && pinch) { const [a, b] = [...ptr.values()];
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]), mx = (a[0] + b[0]) / 2 - r.left, my = (a[1] + b[1]) / 2 - r.top;
+        x += (ev.clientX - px) / 2; y += (ev.clientY - py) / 2; zoomEn(pinch.s * d / pinch.d, mx, my); mov = true; }
+      else if (ptr.size === 1) { const dx = ev.clientX - px, dy = ev.clientY - py; if (Math.abs(dx) + Math.abs(dy) > 2) mov = true; x += dx; y += dy; pintar(); }
+    });
+    const soltar = ev => { ptr.delete(ev.pointerId); if (ptr.size < 2) pinch = null;
+      if (ev.type === "pointerup" && !mov && ptr.size === 0) {   // doble toque: amplía ×2.5 ahí; si ya está ampliado, vuelve a ver todo
+        const ahora = Date.now(), r = lz.getBoundingClientRect();
+        if (ahora - ult < 320) { s > base * 1.5 ? ajustar() : zoomEn(base * 2.5, ev.clientX - r.left, ev.clientY - r.top); ult = 0; } else ult = ahora; } };
+    lz.addEventListener("pointerup", soltar); lz.addEventListener("pointercancel", soltar);
+    lz.addEventListener("wheel", ev => { ev.preventDefault(); const r = lz.getBoundingClientRect();
+      if (ev.ctrlKey || Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) zoomEn(s * Math.exp(-ev.deltaY * (ev.ctrlKey ? .01 : .0018)), ev.clientX - r.left, ev.clientY - r.top);
+      else { x -= ev.deltaX; pintar(); } }, { passive: false });
+    // minimapa: tocarlo lleva a esa zona
+    mapa.onpointerdown = ev => { ev.stopPropagation(); const r = mapa.getBoundingClientRect(), k = Math.min(mapa.width / W, mapa.height / H),
+      ox = (mapa.width - W * k) / 2, oy = (mapa.height - H * k) / 2, fx = ((ev.clientX - r.left) * mapa.width / r.width - ox) / k, fy = ((ev.clientY - r.top) * mapa.height / r.height - oy) / k;
+      x = lz.clientWidth / 2 - fx * s; y = lz.clientHeight / 2 - fy * s; pintar(); };
+    const cerrar = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); ov.remove(); document.body.style.overflow = document.documentElement.style.overflow = "";
+      document.removeEventListener("keydown", tecla, true); removeEventListener("resize", ajustar); };
+    const accion = a => { const [mx, my] = centro();
+      if (a === "x") cerrar(); else if (a === "+") zoomEn(s * 1.5, mx, my); else if (a === "-") zoomEn(s / 1.5, mx, my); else if (a === "0") ajustar();
+      else if (a === "f") document.fullscreenElement ? document.exitFullscreen() : ov.requestFullscreen().catch(() => {}); };
+    ov.querySelectorAll("[data-a]").forEach(b => b.onclick = ev => { ev.stopPropagation(); SON.tick(); accion(b.dataset.a); });
+    const tecla = ev => { const k = { Escape: "x", "+": "+", "=": "+", "-": "-", "0": "0" }[ev.key];
+      const fl = { ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] }[ev.key];
+      if (k) { ev.preventDefault(); ev.stopPropagation(); accion(k); } else if (fl) { ev.preventDefault(); ev.stopPropagation(); x += fl[0]; y += fl[1]; pintar(); } };
+    document.addEventListener("keydown", tecla, true); addEventListener("resize", ajustar);
+    document.addEventListener("fullscreenchange", () => ov.isConnected && setTimeout(ajustar, 120));
+  }
+
   function vistaLamina(l, sub) {
     const g = grupoDe(l);
     let h = `<div class="migas"><a href="#/">← Láminas</a> · ${g.icono} ${g.nombre}</div>
       <h1>Lámina ${l.n} · ${l.titulo} <small>${l.subtitulo}</small></h1><div class="lema">${l.lema}</div>
-      <nav class="pestanas"><a href="#/l/${l.n}/imagen">🖼️ Imagen</a>${l.cadena ? `<a href="#/l/${l.n}/cadena">⚙️ ${l.cadena.titulo}</a>` : ""}
+      <nav class="pestanas"><a href="#/l/${l.n}/imagen">🖼️ Imagen</a>${l.entender ? `<a href="#/l/${l.n}/entender">📖 Entiéndelo</a>` : ""}${l.cadena ? `<a href="#/l/${l.n}/cadena">⚙️ ${l.cadena.titulo}</a>` : ""}${l.esquema ? `<a href="#/l/${l.n}/esquema">🗺️ Esquema</a>` : ""}${l.memoria && l.memoria.length ? `<a href="#/l/${l.n}/memoria">🧠 Recordarlo</a>` : ""}
       <a href="#/l/${l.n}/preguntas">❓ Preguntas <span class="prog" id="prog-l">${progresoLamina(l)[0]}/${l.preguntas.length} ✓</span></a>${l.escalas && l.escalas.length ? `<a href="#/l/${l.n}/escalas">📏 Escalas (${l.escalas.length})</a>` : ""}${l.tabla ? `<a href="#/l/${l.n}/tabla">📋 Tabla</a>` : ""}${(A.modulos || []).filter(m => (m.laminas || []).includes(l.n)).map(m => `<a href="${m.href}">${m.enlace}</a>`).join("")}
       ${l.n > 1 && porN[l.n - 1] ? `<a class="nav-l" href="#/l/${l.n - 1}" title="${porN[l.n - 1].titulo}">← ${l.n - 1}</a>` : ""}${porN[l.n + 1] ? `<a class="nav-l" href="#/l/${l.n + 1}" title="${porN[l.n + 1].titulo}">${l.n + 1} →</a>` : ""}</nav>
       <section id="imagen" class="zona"><div><div class="marco">
@@ -370,12 +493,8 @@
         ${l.numeros.length ? `<div class="nums"><h3>🔢 Números clave <small>toca una letra para verla en la imagen</small></h3>
           <div class="numgrid">${l.numeros.map(x => `<div class="ncard" data-l="${x.l}"><span class="lt grande">${x.l}</span><div class="ntx">${x.html}${x.rango ? regla(x.rango) : ""}</div></div>`).join("")}</div></div>` : ""}
       </section>` : ""}
-      ${l.memoria && l.memoria.length ? `<h2 id="memoria">🧠 Cómo recordarlo <small style="font-size:14px;color:var(--tx2);font-weight:500">primero entiéndelo; esto es solo para los datos duros</small></h2>
-        <div class="mem-grid">${l.memoria.map(m => `<div class="mem-card"><div class="mem-cab"><span class="mem-ic">${m.icono}</span><b>${m.tipo}</b></div>
-          <div class="mem-dato">${m.dato}</div>${m.tecnica ? `<div class="mem-tec">${m.tecnica}</div>` : ""}
-          ${m.escena ? `<div class="mem-esc">🎬 ${m.escena}</div>` : ""}
-          ${m.pregunta ? `<div class="mem-prueba"><span>❓ ${m.pregunta}</span><button class="btn chico sec mem-ver">Ver respuesta</button><div class="mem-resp" hidden>${m.resp || m.dato}</div></div>` : ""}</div>`).join("")}</div>` : ""}
       ${l.escalas && l.escalas.length ? `<h2 id="escalas">📏 Escalas que se aplican</h2><div class="escgrid">${l.escalas.map(escalaHTML).join("")}</div>` : ""}`;
+    if (l.entender) h += entenderHTML(l);
     if (l.cadena) {
       const c = l.cadena;
       h += `<h2 id="cadena">⚙️ ${c.titulo} <small style="font-size:14px;color:var(--tx2);font-weight:500">${c.subtitulo}</small></h2>
@@ -389,6 +508,12 @@
           (j ? "<i>›</i>" : "") + `<span class="e${j === s.pasos.length - 1 ? " fin" : ""}">${p}</span>`).join("")}</div></div>`).join("")}
         ${c.html ? `<div class="libre">${c.html}</div>` : ""}<div class="fuente">${c.fuente}</div>`;
     }
+    if (l.esquema) h += esquemaHTML(l);
+    h += `${l.memoria && l.memoria.length ? `<h2 id="memoria">🧠 Cómo recordarlo <small style="font-size:14px;color:var(--tx2);font-weight:500">primero entiéndelo; esto es solo para los datos duros</small></h2>
+        <div class="mem-grid">${l.memoria.map(m => `<div class="mem-card"><div class="mem-cab"><span class="mem-ic">${m.icono}</span><b>${m.tipo}</b></div>
+          <div class="mem-dato">${m.dato}</div>${m.tecnica ? `<div class="mem-tec">${m.tecnica}</div>` : ""}
+          ${m.escena ? `<div class="mem-esc">🎬 ${m.escena}</div>` : ""}
+          ${m.pregunta ? `<div class="mem-prueba"><span>❓ ${m.pregunta}</span><button class="btn chico sec mem-ver">Ver respuesta</button><div class="mem-resp" hidden>${m.resp || m.dato}</div></div>` : ""}</div>`).join("")}</div>` : ""}`;
     h += `<h2 id="preguntas">❓ Las preguntas del banco que responde</h2>
       <div class="filtros" id="filtros"><button data-f="todas" class="on">Todas</button><button data-f="fuego">🔥 3 veces</button>
       <button data-f="rep">🔁 2+ veces</button><button data-f="exa">📝 De examen</button><button data-f="pend">Pendientes</button><button data-f="mal">✗ Para repasar</button>
@@ -406,6 +531,8 @@
     montarLienzo(l);
     if (l.cadena) montarCadena();
     montarFichas(l);
+    if (l.entender) montarEntender(l);
+    if (l.esquema) montarEsquema(l);
     enlazar(vista, l);
     vista.normalize(); siglas(vista); conceptos(vista);
     $$(".tabla.t2 tbody tr").forEach(tr => tr.onclick = () => { SON.tick(); const on = tr.classList.contains("sel"); $$(".tabla.t2 tr.sel").forEach(x => x.classList.remove("sel")); if (!on) tr.classList.add("sel"); });
