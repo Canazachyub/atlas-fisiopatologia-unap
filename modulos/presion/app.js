@@ -97,6 +97,11 @@
           <label>Nivel del brazo <select id="c-niv"><option value="corazon">A la altura del corazón (4.º espacio)</option><option value="abajo">Manómetro por debajo del corazón</option><option value="arriba">Manómetro por encima del corazón</option></select></label>
           <label>Brazo <select id="c-brazo"><option value="der">Derecho</option><option value="izq">Izquierdo</option></select></label></div></div>
       </div>
+      <div class="caja" style="margin-top:6px;padding:10px 12px"><div class="chips" id="modoesc" style="margin:0 0 8px">
+          <button class="chip act" data-m="real" aria-pressed="true">🖼️ Realista</button><button class="chip" data-m="esq" aria-pressed="false">📐 Esquema</button></div>
+        <div class="escena-real" id="brazoreal"><canvas role="img" aria-label="Brazo con manguito que se hincha, estetoscopio sobre la braquial y pulso que llega a la radial"></canvas><img class="rot" alt="" src="rot_brazo.svg"></div>
+        <svg id="escena" viewBox="0 0 640 220" style="width:100%;height:auto;display:none" role="img" aria-label="Brazo con manguito, estetoscopio y pulso radial"></svg>
+        <p class="pie-esc nota solo-movil">Manguito sobre la piel, borde inferior a 2 traveses de dedo del pliegue; estetoscopio sobre la braquial en el pliegue del codo; la radial (lado del pulgar) da solo la sistólica palpatoria.</p></div>
       <div class="grid2" style="margin-top:6px">
         <div>
           <div class="caja"><h3 style="margin-top:0">2 · Infla y desinfla</h3>
@@ -118,7 +123,7 @@
             <p class="aviso-snd" style="margin:4px 0 0">🔈 El sonido es <b>sintetizado y orientativo</b>: imita el carácter de cada fase (golpe nítido, soplo, agudo, apagado), no es una grabación real. Sin audio, la fase y la cadencia se ven en el letrero y en el gráfico.</p></div>
         </div>
         <div>
-          <div class="caja" style="padding:8px 10px"><svg id="escena" viewBox="0 0 640 220" style="width:100%;height:auto;display:block" role="img" aria-label="Brazo con manguito, estetoscopio y pulso radial"></svg>
+          <div class="caja" style="padding:8px 10px">
             <canvas class="cv" id="art"></canvas>
             <div class="letrero" id="letrero" style="margin-top:8px"><span class="k" id="l-k">—</span><span id="l-t">Manguito vacío: la arteria está abierta, el flujo es laminar y no se oye nada.</span></div>
             <div class="fases" id="fases">${["I", "II", "III", "IV", "V"].map(f => `<span data-f="${f}" title="Fase ${f}">${f}</span>`).join("")}</div>
@@ -205,6 +210,13 @@
         </g>`;
     }
     dibujaEscena();
+    const real = U.brazoReal($("#brazoreal"));
+    $$("#modoesc .chip").forEach(b => b.onclick = () => {
+      const r = b.dataset.m === "real"; ST.modoEsc = b.dataset.m;
+      $$("#modoesc .chip").forEach(x => { x.classList.toggle("act", x === b); x.setAttribute("aria-pressed", x === b); });
+      $("#brazoreal").style.display = r ? "" : "none"; $("#escena").style.display = r ? "none" : "block"; if (r) real.medir();
+    });
+    if (ST.modoEsc === "esq") $('#modoesc .chip[data-m="esq"]').click();
 
     /* ----- lienzos: arteria y trazado ----- */
     const cvA = $("#art"), cvT = $("#traza");
@@ -339,6 +351,9 @@
       // la escena (manguito que se hincha) se redibuja solo si cambió la presión
       if (Math.abs(sim.p - (sim.pEsc || -9)) > 1.5) { sim.pEsc = sim.p; dibujaEscena(); }
       dibujaArteria(open, sim.turb, 0, estado);
+      if (ST.modoEsc !== "esq") { const ds = sim.t - sim.ultimoSnd;
+        real.pintar({ p: sim.p, est: sim.est, pal: sim.pal, pulsoRadial: sim.t < sim.lampHasta, tBeat: sim.tBeat, t: sim.t, abre: sim.pico > sim.p + 0.3 && sim.p > 3,
+          sonido: ds < 0.35 && sim.ult ? 1 - ds / 0.35 : 0, colSonido: COL_FASE[sim.ult] || "#DC2626", nivel: ST.cond.nivel, ropa: ST.cond.ropa, ajuste: ST.cond.ajuste }, dt); }
       dibujaTraza(sim.t);
       anim = requestAnimationFrame(paso);
     }

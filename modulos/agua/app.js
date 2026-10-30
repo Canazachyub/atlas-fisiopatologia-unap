@@ -97,6 +97,9 @@
         </div>
       </div>
     </div>
+    <div class="caja" style="padding:10px 12px"><h3 style="margin:2px 0 8px">🔬 Lo que le pasa a una célula <small class="nota">(ilustración + capa viva; el tamaño se exagera ×4 para que se vea)</small></h3>
+      <div class="escena-real" id="celreal" style="background:#8EC5EC"><canvas role="img" aria-label="Célula en el líquido extracelular que se arruga o se hincha según el sodio de afuera; gotas de agua que entran o salen"></canvas><img class="rot" alt="" src="rot_normal.svg"></div>
+      <p class="pie-esc nota"></p></div>
     <div class="grid2" style="margin-top:6px">
       <div>
         <div class="letrero" id="letrero" style="display:block"></div>
@@ -217,7 +220,7 @@
     };
 
     /* ---- célula ---- */
-    const cel = $("#celula", cont);
+    const cel = $("#celula", cont), real = U.celReal($("#celreal", cont));
     function dibujaCelula(ratio) {
       const r0 = 50, cx = 120, cy = 82;
       const r = Math.min(76, r0 * Math.sqrt(Math.max(0.4, ratio)));
@@ -263,6 +266,7 @@
       $("#fl1", sv).setAttribute("opacity", a); $("#ph1", sv).setAttribute("opacity", mov < 0 ? a : 0); $("#ph2", sv).setAttribute("opacity", mov > 0 ? a : 0);
       $("#fl1", sv).style.animationDirection = mov > 0 ? "reverse" : "normal";
       if ((nrate++ & 1) === 0) dibujaCelula(vis.vic / est.vic0);
+      real.pintar(vis.vic / est.vic0, est.vic - vis.vic, est.na, dt, t / 1000);
       requestAnimationFrame(bucle);
     })(performance.now());
     U.repintar = () => pintarTexto();
