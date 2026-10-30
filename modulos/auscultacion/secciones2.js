@@ -28,6 +28,9 @@
         <div class="ctrl"><button class="btn" id="play">▶ Escuchar</button><label>Volumen <input type="range" id="vol" min="0.2" max="1" step="0.05" value="${U.volumen}"></label>
         <label>Grado <input type="range" id="gr" min="1" max="6" value="3"><b id="grv">III/VI</b></label><label>FC <input type="range" id="fc" min="55" max="120" value="77"><b id="fcv">77</b></label></div>
         <div class="letrero" id="let"></div></div>
+      <div class="caja" style="padding:10px 12px"><h3 style="margin:2px 0 8px">❤️ Qué pasa dentro del corazón <small class="nota">(ilustración + capa viva: el chorro sale al mismo tiempo que el soplo)</small></h3>
+        <div class="escena-real" id="correal" style="background:#01193F"><canvas role="img" aria-label="Corazón en corte con las cuatro válvulas; el chorro turbulento de la lesión aparece cuando suena el soplo"></canvas><img class="rot" alt="" src="rot_valvulas.svg"></div>
+        <p class="pie-esc nota solo-movil">Verde = válvula abierta; roja = cerrada; anillo amarillo = la válvula enferma. El chorro amarillo es el flujo turbulento que se oye como soplo.</p></div>
       <div class="grid2"><div class="caja"><div id="torso"></div><p class="nota" style="text-align:center">Disco amarillo: donde se oye más fuerte. Flechas rojas: irradiación. <b>Toca otro foco</b> para auscultar ahí y ver cómo cambia la intensidad.</p></div>
         <div><h3 style="margin-top:0">Maniobras</h3><div class="chips" id="man"></div><div class="letrero" id="manLet"></div>
           <div class="caja info" id="ficha"></div></div></div>`;
@@ -38,6 +41,7 @@
     };
     const P = U.Player(cfg, { silencio: true });
     let anim = 0, gen = U.gen;
+    const real = U.corSoplo($("#correal"), A);
     U.alSalir = () => { P.parar(); cancelAnimationFrame(anim); };
     function torso() {
       const v = A.VALV[st.v], p = A.puntoDe(v), foco = st.foco || U.focoDe(v);
@@ -81,7 +85,7 @@
       st.sonido = !st.sonido; P.sonido = st.sonido; $("#play").textContent = st.sonido ? "⏹ Silenciar" : "▶ Escuchar"; if (st.sonido) U.activarAudio();
     };
     pintarMan(); torso(); live(); P.iniciar();
-    (function bucle() { if (gen !== U.gen) return; U.dibujarFono($("#fono"), P, { alto: 160, ventana: 2.4 }); anim = requestAnimationFrame(bucle); })();
+    (function bucle() { if (gen !== U.gen) return; U.dibujarFono($("#fono"), P, { alto: 160, ventana: 2.4 }); real.pintar(P.estado(), st.v, A.VALV[st.v].n); anim = requestAnimationFrame(bucle); })();
     U.alRedimensionar = torso;
   };
 })();

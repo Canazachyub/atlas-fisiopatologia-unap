@@ -162,8 +162,11 @@
         <p class="nota">Normales de la clase: pH 7,35-7,45 · PaCO₂ 40 (35-45) · HCO₃⁻ 22-26 (media 24) · BE ±2,5.</p>
         <div class="dif" id="dis"></div>
       </div></div></div>
-      <div class="letrero" id="liv" style="margin-top:10px"></div>`;
-    const P = U.panel($("#pan", main));
+      <div class="letrero" id="liv" style="margin-top:10px"></div>
+      <div class="caja" style="margin-top:10px;padding:10px 12px"><h3 style="margin:2px 0 8px">🫁 Lo que pasa en el alvéolo y la sangre <small class="nota">(ilustración + capa viva: las moléculas siguen tu gasometría)</small></h3>
+        <div class="escena-real" id="gasreal" style="background:#F4C9C9"><canvas role="img" aria-label="Alvéolo y capilar: el CO2 de la sangre pasa al aire según la ventilación; el bicarbonato y el pH cambian con los controles"></canvas><img class="rot" alt="" src="rot_gas.svg"></div>
+        <p class="pie-esc nota solo-movil">Azul = CO₂ (lo saca el pulmón); rombo verde = HCO₃⁻ (lo regula el riñón); rojo = O₂. El plasma se tiñe naranja si hay acidosis y violeta si hay alcalosis.</p></div>`;
+    const P = U.panel($("#pan", main)), real = U.gasReal($("#gasreal", main));
     const st = { pco2: 40, hco3: 24 };
     const presets = [
       { id: "norm", t: "Normal", pco2: 40, hco3: 24 },
@@ -183,7 +186,7 @@
       sph.value = v.pH; sco.value = v.pco2; shc.value = v.hco3;
       $("#s-phv", main).textContent = f(v.pH, 2); $("#s-cov", main).textContent = f(v.pco2); $("#s-hcv", main).textContent = f(v.hco3, 1);
       const L = A.leer(v);
-      P.pintar(v, L);
+      P.pintar(v, L); real.set(v);
       $("#liv", main).innerHTML = U.vivo(L, v);
       // discrepancias y avisos de la clase
       const av = [];

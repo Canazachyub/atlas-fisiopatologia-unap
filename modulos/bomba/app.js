@@ -178,11 +178,14 @@
             <div id="sliders"></div></div>
           <div class="caja"><div id="kp"></div><div id="corazon"></div></div>
         </div>
-      </div>`;
+      </div>
+      <div class="caja" style="padding:10px 12px"><h3 style="margin:2px 0 8px">❤️ El corazón por dentro <small class="nota">(ilustración + capa viva: late, se llena y expulsa con tu modelo)</small></h3>
+        <div class="escena-real" id="correal" style="background:#01193F"><canvas role="img" aria-label="Corazón en corte: los ventrículos se llenan y se contraen, la sangre pasa por las válvulas abiertas"></canvas><img class="rot" alt="" src="rot_corazon.svg"></div>
+        <p class="pie-esc nota"></p></div>`;
     const cv = $("#cv"), W = 560, X0 = 58, X1 = 540, Y0 = 22, Y1 = 300, SVMAX = 160;
     const xo = P => X0 + P / K.P_MAX * (X1 - X0), yo = v => Y1 - v / SVMAX * (Y1 - Y0);
     const path = pts => pts.map((p, i) => (i ? "L" : "M") + xo(p.P).toFixed(1) + " " + yo(p.SV).toFixed(1)).join(" ");
-    const corazon = U.corazon($("#corazon"));
+    const corazon = U.corazon($("#corazon")), real = U.corReal($("#correal"), B);
     let disp = null, traza = [], fase = 0;
 
     function estatico() {   // lo que cambia solo al mover un control
@@ -222,6 +225,7 @@
       fase += dt * e.FC / 60 * U.velocidad;
       const pt = B.punto(fase, e, h);
       corazon.upd(pt, e, h);
+      real.pintar(pt, e, h, dt, U.velocidad);
       const tx = xo(e.P), ty = yo(h.SV);
       if (!disp) disp = { x: tx, y: ty };
       disp.x += (tx - disp.x) * Math.min(1, dt * 6); disp.y += (ty - disp.y) * Math.min(1, dt * 6);

@@ -4,6 +4,7 @@
   const U = window.UTIL, P = window.PAR, SECC = window.SECC;
   const LADOS = { D: "derecho", I: "izquierdo" };
   const otro = l => (l === "D" ? "I" : "D");
+  let MODO = "real";   // escena realista o esquema
 
   SECC.linterna = function (cont) {
     const E = { les: "normal", lado: "D", cerca: 0, pos: null, oscila: false, tSw: 0 };
@@ -13,7 +14,10 @@
       <div class="grid2">
         <div>
           <div class="caja">
-            <svg class="dib" id="cara" viewBox="0 0 600 300" role="img" aria-label="Dos ojos y una linterna que se arrastra"></svg>
+            <div class="chips" id="modoesc" style="margin:0 0 8px"><button class="chip act" data-m="real" aria-pressed="true">🖼️ Realista</button><button class="chip" data-m="esq" aria-pressed="false">📐 Esquema</button></div>
+            <div class="escena-real real" id="carareal"><canvas role="img" aria-label="Dos ojos realistas: la pupila se achica con la luz y se agranda en la oscuridad"></canvas><img class="rot" alt="" src="rot_pupila.svg">
+            <svg class="dib" id="cara" viewBox="0 0 600 300" role="img" aria-label="Dos ojos y una linterna que se arrastra" style="position:absolute;left:0;top:0;width:100%;height:100%"></svg></div>
+            <p class="pie-esc nota solo-movil">Pupila: el agujero del iris (normal de 2 a 6 mm). El esfínter (III par) la cierra con la luz; el dilatador (simpático) la abre.</p>
             <div class="ctrl">
               <button class="btn sec" data-l="D">🔦 Ojo derecho</button><button class="btn sec" data-l="I">🔦 Ojo izquierdo</button>
               <button class="btn sec" id="osc">↔️ Oscilar</button><button class="btn sec" id="apaga">Apagar</button>
@@ -53,10 +57,21 @@
     /* ---------- cara con dos ojos ---------- */
     const cara = U.$("#cara", cont);
     const CX = { D: 170, I: 430 }, CY = 150, ESC = 1.3;   // el ojo derecho del paciente queda a la izquierda de la pantalla
+    const cejas = [];
     for (const l of ["D", "I"]) {
-      U.el("path", { class: "trazo", d: `M${CX[l] - 90} ${CY - 70} Q${CX[l]} ${CY - 100} ${CX[l] + 90} ${CY - 70}`, "stroke-width": 7, opacity: .5 }, cara);
+      cejas.push(U.el("path", { class: "trazo", d: `M${CX[l] - 90} ${CY - 70} Q${CX[l]} ${CY - 100} ${CX[l] + 90} ${CY - 70}`, "stroke-width": 7, opacity: .5 }, cara));
     }
     const ojos = { D: U.ojo(cara, CX.D, CY, ESC), I: U.ojo(cara, CX.I, CY, ESC) };
+    const caraR = U.$("#carareal", cont), real = U.carasReal(caraR);
+    const modo = m => {
+      MODO = m; const r = m === "real";
+      U.$$("#modoesc .chip", cont).forEach(x => { x.classList.toggle("act", x.dataset.m === m); x.setAttribute("aria-pressed", x.dataset.m === m); });
+      caraR.classList.toggle("real", r); caraR.querySelector("canvas").style.display = caraR.querySelector("img.rot").style.display = r ? "" : "none";
+      cara.style.position = r ? "absolute" : "static"; [ojos.D.g, ojos.I.g, ...cejas].forEach(g => g.style.display = r ? "none" : "");
+      if (r) real.medir();
+    };
+    U.$$("#modoesc .chip", cont).forEach(b => b.onclick = () => modo(b.dataset.m));
+    modo(MODO);
     const rotulo = {};
     for (const l of ["D", "I"]) {
       U.el("text", { class: "txt", x: CX[l], y: 258, "text-anchor": "middle" }, cara, "Ojo " + LADOS[l] + " del paciente");
@@ -200,7 +215,7 @@
       // luz con latencia
       const li = luzIn(), last = hist[hist.length - 1][1];
       if (li.D !== last.D || li.I !== last.I) hist.push([tt, li]);
-      const le = luzEf(), pu = P.pupila(E.les, E.lado, le, E.cerca), sr = P.signosReposo(E.les, E.lado);
+      const le = luzEf(), pu = P.pupila(E.les, E.lado, le, E.cerca), sr = P.signosReposo(E.les, E.lado), escR = { luz: li };
       for (const e of ["D", "I"]) {
         const tg = pu[e].d, tau = tg < dia[e] ? P.TAU_CONTRAE : P.TAU_DILATA;
         dia[e] += (tg - dia[e]) * (1 - Math.exp(-dt / tau));
@@ -208,9 +223,10 @@
         const m = sr.mirada[e], noConv = E.les === "iii" && E.lado === e;
         let px = (e === "D" ? -1 : 1) * 0.5 * E.cerca * (noConv ? 0 : 1), py = 0;
         if (m) { px += (e === "D" ? 1 : -1) * m.abd; py += m.y; }
-        ojos[e].set({ d: dia[e], px, py, ptosis: sr.ptosis[e], enof: sr.enoftalmos[e], irregular: pu[e].irregular });
+        ojos[e].set(escR[e] = { d: dia[e], px, py, ptosis: sr.ptosis[e], enof: sr.enoftalmos[e], irregular: pu[e].irregular });
         rotulo[e].textContent = `${U.fmt(dia[e])} mm`;
       }
+      if (MODO === "real") real.pintar(escR, dt);
       dedo.setAttribute("r", (5 + E.cerca * 22).toFixed(1)); dedo.setAttribute("cy", (150 + E.cerca * 10).toFixed(1));
       // diagrama (con la luz sin retraso: muestra la señal que se envía)
       const v = P.via(E.les, E.lado, le);

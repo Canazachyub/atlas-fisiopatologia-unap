@@ -243,9 +243,13 @@
   SECC.paciente = function (main) {
     main.innerHTML = `<h1>Paciente virtual: examina el tórax</h1>
       <p class="lema">Elige el síndrome y el lado, y «examina» tocando las zonas con las cuatro herramientas. Cada hallazgo trae su explicación causa → efecto, y el corte muestra qué hay dentro: líquido, aire, exudado, colapso y hacia dónde se mueve el mediastino.</p>
-      ${avisoSonido}<div id="expl"></div>`;
+      ${avisoSonido}<div id="expl"></div>
+      <div class="caja" style="margin-top:10px;padding:10px 12px"><h3 style="margin:2px 0 8px">🫁 Lo que pasa en el alvéolo <small class="nota">(ilustración + capa viva: cambia con el síndrome que elijas)</small></h3>
+        <div class="escena-real" id="alvreal" style="background:#020B22"><canvas role="img" aria-label="Racimo de alvéolos que respira; según el síndrome se llena de exudado, se colapsa, atrapa aire o tiene líquido"></canvas><img class="rot" alt="" src="rot_alveolos.svg"></div>
+        <p class="pie-esc nota"></p></div>`;
     const s = P.S[SEL.id];
     Explorador($("#expl", main), { libre: true, id: SEL.id, lado: s.bilateral ? "ambos" : SEL.lado });
+    U.alvReal($("#alvreal", main), P);
   };
 
   /* =====================================================================

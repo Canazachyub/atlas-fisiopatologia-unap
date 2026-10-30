@@ -110,6 +110,15 @@ th{color:var(--az);font-family:var(--f-tit);font-weight:500}
 .ok{color:var(--ve);font-weight:700}.mal{color:var(--ro);font-weight:700}
 ul.sin{margin:4px 0 4px 18px;padding:0}
 @media (max-width:600px){.ctrl.col label{grid-template-columns:78px 1fr 56px}}
+/* escena realista: ilustración + lienzo vivo + rótulos de draw.io */
+.escena-real{position:relative;border-radius:14px;overflow:hidden;line-height:0;max-width:1000px;margin:0 auto;background:#CDD0D4}
+.escena-real canvas{display:block;width:100%;height:auto}
+.escena-real img.rot{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.escena-real img.rot.ve{animation:rotin .45s ease}
+@keyframes rotin{from{opacity:0}to{opacity:1}}
+.pie-esc{max-width:1000px;margin:6px auto 0!important;line-height:1.45}
+.solo-movil{display:none}
+@media (max-width:560px){.escena-real img.rot{display:none}.solo-movil{display:block}}
 </style>
 </head>
 <body>
@@ -124,6 +133,7 @@ ul.sin{margin:4px 0 4px 18px;padding:0}
 <main id="vista"></main>
 <script src="motor.js"></script>
 <script src="app.js"></script>
+<script src="escena.js"></script>
 <script src="secciones.js"></script>
 <script src="secciones2.js"></script>
 <script src="video.js"></script>
