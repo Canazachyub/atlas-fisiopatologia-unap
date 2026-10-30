@@ -1,14 +1,14 @@
 /* Atlas sin internet: guarda todo el atlas la primera vez y lo sirve desde el teléfono, la tablet o la PC.
    web.py rellena la versión y la lista de archivos en cada compilación; una versión nueva reemplaza la caché vieja. */
 // varias apps comparten canazachyub.github.io: el nombre lleva la carpeta para no tocar las cachés de otra
-const BASE = "atlas " + self.registration.scope + " ", CACHE = BASE + "20261029175439";
+const BASE = "atlas " + self.registration.scope + " ", CACHE = BASE + "20261029220620";
 const NUCLEO = [
  "./",
- "fonts.css?v=20261029175439",
- "app.css?v=20261029175439",
- "datos.js?v=20261029175439",
- "app.js?v=20261029175439",
- "chat.js?v=20261029175439",
+ "fonts.css?v=20261029220620",
+ "app.css?v=20261029220620",
+ "datos.js?v=20261029220620",
+ "app.js?v=20261029220620",
+ "chat.js?v=20261029220620",
  "manifest.webmanifest",
  "icono-192.png",
  "icono-512.png",
@@ -258,10 +258,13 @@ const RESTO = [
  "modulos/ecg/img/torso.webp",
  "modulos/edema/app.js",
  "modulos/edema/casos.js",
+ "modulos/edema/escena.js",
+ "modulos/edema/escena.webp",
  "modulos/edema/index.html",
  "modulos/edema/motor.js",
  "modulos/edema/secciones.js",
  "modulos/edema/secciones2.js",
+ "modulos/edema/video_fuga.jpg",
  "modulos/pares/app.js",
  "modulos/pares/index.html",
  "modulos/pares/linterna.js",
@@ -305,6 +308,8 @@ self.addEventListener("activate", ev => {
 self.addEventListener("fetch", ev => {
   const r = ev.request;
   if (r.method !== "GET" || new URL(r.url).origin !== location.origin) return;
+  // los videos de los módulos se piden por partes (Range): van directo a la red, sin caché
+  if (r.headers.has("range") || r.destination === "video" || /\.mp4$/.test(new URL(r.url).pathname)) return;
   // la página: primero la red (para recibir versiones nuevas), y sin internet la guardada
   if (r.mode === "navigate") {
     // cada página se guarda con su propia dirección (el atlas y los módulos interactivos)

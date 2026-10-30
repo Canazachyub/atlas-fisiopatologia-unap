@@ -69,9 +69,17 @@
     sec.innerHTML = `
       <h1>💧 Capilar vivo</h1>
       <p class="lema">Mira el agua cruzar la pared del capilar. En el extremo <b>arterial</b> la presión hidrostática empuja el agua <b>hacia afuera</b>; en el <b>venoso</b>, cuando la presión cae, la oncótica de la albúmina la <b>devuelve</b>. Lo que sobra lo retira el <b>linfático</b>. Si la filtración supera a la linfa, el intersticio se hincha: eso es el edema.</p>
+      <details class="caja video-ani"><summary>🎬 Ver el video (animación hecha con Google Flow)</summary>
+        <video src="video_fuga.mp4" poster="video_fuga.jpg" muted loop playsinline controls preload="none" aria-label="Animación: el plasma sale del capilar al intersticio y el linfático lo drena"></video>
+        <p class="nota">Los glóbulos rojos y la <b style="color:#A16207">albúmina</b> se quedan dentro; el <b style="color:#0284C7">agua del plasma</b> sale por las hendiduras y se acumula en el intersticio; el <b style="color:#15803D">linfático</b> recoge una parte.</p>
+      </details>
       <div class="grid2">
         <div>
-          <div class="panel caja" style="padding:8px"><canvas id="cv" role="img" aria-label="Capilar con intersticio y linfático; partículas de agua entrando y saliendo"></canvas></div>
+          <div class="panel caja" style="padding:8px">
+            <div class="chips" id="modo" style="margin:0 0 8px"></div>
+            <div class="escena" id="esc"><img id="esc-img" src="escena.webp" alt="" draggable="false"><canvas id="cv" role="img" aria-label="Capilar con intersticio y linfático; partículas de agua entrando y saliendo"></canvas><div class="esc-eti" id="esc-eti"></div></div>
+            <p class="nota" id="leyenda" style="margin:6px 4px 0"></p></div>
+          <div class="panel caja" style="padding:10px 12px"><h3 style="margin:2px 0 8px">⚖️ Tira y afloja de Starling <small class="nota">(mmHg)</small></h3><div class="tira" id="tira"></div></div>
           <div class="panel caja" style="padding:8px"><canvas id="pl" role="img" aria-label="Gráfico de las fuerzas de Starling a lo largo del capilar"></canvas>
             <p class="nota" style="margin:4px 4px 0">Gráfico: <b style="color:#B91C1C">rojo</b> = fuerzas que sacan el agua (presión capilar − presión intersticial); <b style="color:#2563EB">azul</b> = fuerza que la retiene (σ × (oncótica del plasma − oncótica intersticial)). Zona roja: sale; zona verde: vuelve.</p></div>
         </div>
@@ -120,6 +128,12 @@
     U.chips($("#circ", sec), [{ id: "sis", t: "🦵 Capilar sistémico" }, { id: "pul", t: "🫁 Capilar pulmonar" }], S.circ, id => {
       U.S = Object.assign(S, { circ: id, p: E.NORMAL(E.CIRC[id]), V: 0, caso: null }); ir();
     });
+    if (!S.modo) S.modo = "real";
+    const LEY = {
+      real: `Ilustración (ChatGPT) con una capa viva encima: <b style="color:#2563EB">●</b> agua que sale, <b style="color:#16A34A">●</b> agua que vuelve, <b style="color:#CA8A04">●</b> albúmina, <b style="color:#9333EA">●</b> linfa, <b style="color:#0EA5E9">●</b> líquido acumulado. Las <b>hendiduras</b> entre células brillan <b style="color:#DC2626">rojo</b> donde sale el agua y <b style="color:#16A34A">verde</b> donde vuelve.`,
+      esq: `Esquema: flechas rojas = sale agua, verdes = vuelve; el intersticio se tiñe de azul al llenarse.` };
+    function aplicaModo() { $("#esc", sec).classList.toggle("esq", S.modo === "esq"); $("#leyenda", sec).innerHTML = LEY[S.modo]; U.real.nuevo(); medir(); }
+    U.chips($("#modo", sec), [{ id: "real", t: "🖼️ Realista" }, { id: "esq", t: "📐 Esquema" }], S.modo, id => { S.modo = id; aplicaModo(); });
     $("#b-norm", sec).onclick = () => { S.p = E.NORMAL(c); S.V = 0; S.caso = null; dibujaSliders(); actualiza(true); };
     $("#b-vacia", sec).onclick = () => { S.V = 0; };
     $("#b-eq", sec).onclick = () => { S.V = E.equilibrio(S.p, c).V; };
@@ -129,12 +143,12 @@
     /* ---- tamaños (nítido en celular y escritorio) ---- */
     function medir() {
       dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-      const w = Math.max(280, cv.parentElement.clientWidth - 16);
-      cv.style.height = Math.round(w * H / W) + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(w * H / W * dpr);
-      escala = w / W * dpr;
+      const w = Math.max(280, $("#esc", sec).clientWidth), real = S.modo !== "esq", LW = real ? U.real.W : W, LH = real ? U.real.H : H;
+      cv.style.height = Math.round(w * LH / LW) + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(w * LH / LW * dpr);
+      escala = w / LW * dpr;
       pw = w; pl.style.height = Math.round(Math.max(150, w * 0.34)) + "px"; pl.width = Math.round(w * dpr); pl.height = Math.round(Math.max(150, w * 0.34) * dpr);
     }
-    medir(); U.alRedimensionar = () => { medir(); };
+    aplicaModo(); U.alRedimensionar = () => { medir(); };
 
     /* ---- partículas ---- */
     const rbc = [], alb = [], gotas = [], pool = [];
@@ -335,8 +349,9 @@
       if (gen !== U.gen || !cv.isConnected) return;
       const dt = Math.min(0.05, (t - tprev) / 1000); tprev = t;
       if (!S.pausa) S.V = E.paso(S.V, S.p, c, dt * 0.12);       // 1 s ≈ 0,12 día del modelo
-      cuadro(t, S.pausa ? 0 : dt); grafica();
-      if (++nfr % 5 === 0) { balance(); const tt = textoCausal(); if (tt !== ult.txt) { $("#let", sec).innerHTML = tt; ult.txt = tt; } }
+      if (S.modo === "esq") cuadro(t, S.pausa ? 0 : dt); else U.real.cuadro(ctx, escala, S, c, S.pausa ? 0 : dt);
+      grafica();
+      if (++nfr % 5 === 0) { balance(); U.tira($("#tira", sec), S, c); if (S.modo !== "esq") U.real.etiquetas($("#esc-eti", sec), S, c); const tt = textoCausal(); if (tt !== ult.txt) { $("#let", sec).innerHTML = tt; ult.txt = tt; } }
       requestAnimationFrame(bucle);
     })(tprev);
   };
