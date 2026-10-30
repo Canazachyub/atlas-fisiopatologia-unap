@@ -1,0 +1,7 @@
+{
+ "titulo": "Agua, sodio y potasio",
+ "icono": "🧂",
+ "descripcion": "Simulador de compartimentos: el agua corporal se reparte entre intracelular, intersticial y plasma y se mueve por ósmosis cuando sumas agua, suero o pierdes sudor, diarrea y vómito. Además: tipos y grados de deshidratación con sus cálculos, hipo/hipernatremia, hipo/hiperpotasemia con desplazamientos transcelulares, calculadora de osmolaridad y casos con ionograma para ponerte a prueba.",
+ "laminas": [4, 5, 6],
+ "enlace_lamina": "🧂 Simulador Agua y electrolitos"
+}

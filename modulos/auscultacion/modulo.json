@@ -1,0 +1,11 @@
+{
+ "titulo": "Auscultación cardiaca",
+ "icono": "🩺",
+ "descripcion": "Focos, ruidos y soplos con sonido sintetizado: toca cada foco en el tórax, mira el fonocardiograma sincronizado con las válvulas del corazón, escucha 14 lesiones (estenosis, insuficiencias, congénitas, frote), prueba las maniobras y practica identificando el soplo a ciegas.",
+ "laminas": [
+  10,
+  11,
+  12
+ ],
+ "enlace_lamina": "🩺 Simulador de auscultación"
+}

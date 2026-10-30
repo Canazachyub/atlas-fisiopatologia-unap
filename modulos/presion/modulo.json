@@ -1,0 +1,9 @@
+{
+ "titulo": "Presión arterial interactiva",
+ "icono": "🩸",
+ "descripcion": "Toma la presión con manguito, manómetro y estetoscopio: oye los ruidos de Korotkoff (fases I-V), anota la sistólica y la diastólica y comprueba tus errores de técnica. Clasifica cifras con las tablas de la clase, calcula diferencial y PAM, mueve el gasto cardiaco y la resistencia periférica y mira los mecanismos de la hipertensión.",
+ "laminas": [
+  9
+ ],
+ "enlace_lamina": "🩸 Simulador de presión arterial"
+}

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presión arterial interactiva</title>
+<meta name="theme-color" content="#1E3A8A">
+<link rel="icon" href="../../icono-192.png">
+<link rel="stylesheet" href="../../fonts.css">
+<style>
+:root{
+  --fondo:#FFFAF0;--papel:#FFFFFF;--tx:#1F2937;--tx2:#5B6472;--borde:#E5E7EB;
+  --az:#1E3A8A;--azc:#3B82F6;--ro:#B91C1C;--ve:#16A34A;--na:#F59E0B;--mo:#7C3AED;--am:#FACC15;--resalte:#FEF3C7;
+  --papel-ecg:#FFF5F3;--linea-ecg:#F6C9C4;--linea-ecg2:#EC9A92;--traza:#111827;
+  --sombra:0 2px 4px rgba(0,0,0,.08);--sombra-md:0 4px 12px rgba(0,0,0,.12);--foco:0 0 0 4px rgba(59,130,246,.35);
+  --f-tit:"Fredoka","Nunito",system-ui,sans-serif;--f-cuerpo:"Nunito","Segoe UI",system-ui,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --fondo:#0F172A;--papel:#1E293B;--tx:#F1F5F9;--tx2:#A3B0C2;--borde:#334155;--az:#93C5FD;--azc:#60A5FA;--ro:#F87171;--mo:#C4B5FD;--resalte:#3B2F0A;
+  --papel-ecg:#101a12;--linea-ecg:#1d3322;--linea-ecg2:#2f5a38;--traza:#7CFC9A;--sombra:0 2px 4px rgba(0,0,0,.4);--sombra-md:0 4px 12px rgba(0,0,0,.5)}}
+:root[data-theme="dark"]{--fondo:#0F172A;--papel:#1E293B;--tx:#F1F5F9;--tx2:#A3B0C2;--borde:#334155;--az:#93C5FD;--azc:#60A5FA;--ro:#F87171;--mo:#C4B5FD;--resalte:#3B2F0A;
+  --papel-ecg:#101a12;--linea-ecg:#1d3322;--linea-ecg2:#2f5a38;--traza:#7CFC9A;--sombra:0 2px 4px rgba(0,0,0,.4);--sombra-md:0 4px 12px rgba(0,0,0,.5)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--tx);font-family:var(--f-cuerpo);font-size:16px;line-height:1.6;overflow-x:hidden}
+h1,h2,h3,.btn,.tabs a,.chip,.marca b,.num{font-family:var(--f-tit)}
+a{color:var(--azc)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:none;box-shadow:var(--foco)!important;border-radius:12px}
+.barra{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;
+  background:color-mix(in srgb,var(--papel) 92%,transparent);backdrop-filter:blur(8px);border-bottom:2px solid var(--borde)}
+.marca{color:var(--tx);text-decoration:none;font-size:15px}.marca b{color:var(--az);font-size:18px;font-weight:600}
+.barra nav{display:flex;gap:6px}
+.barra nav a,.barra nav button{min-height:40px;padding:6px 12px;border-radius:999px;border:2px solid var(--borde);background:var(--papel);text-decoration:none;color:var(--tx);cursor:pointer;font-family:var(--f-tit)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;position:sticky;top:58px;z-index:40;background:var(--fondo);scrollbar-width:thin}
+.tabs a{flex:none;padding:8px 14px;border-radius:999px;border:2px solid var(--borde);background:var(--papel);text-decoration:none;color:var(--tx);font-weight:500;white-space:nowrap}
+.tabs a.act{background:var(--az);border-color:var(--az);color:#fff}
+main{max-width:1400px;margin:0 auto;padding:6px 16px 70px}
+h1{color:var(--az);margin:6px 0 4px;font-size:clamp(24px,3.2vw,34px);font-weight:700}
+h2{color:var(--az);margin:26px 0 8px;font-size:24px;font-weight:600}
+h3{margin:14px 0 6px;font-size:19px;font-weight:600;color:var(--az)}
+.lema{color:var(--tx2);max-width:950px;margin:0 0 12px}
+.caja{background:var(--papel);border-radius:20px;box-shadow:var(--sombra);padding:14px 16px;margin:10px 0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}.tabs{top:56px}}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:8px 16px;border-radius:20px;border:0;background:var(--am);color:#1b1b1b;font-weight:600;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.22);text-decoration:none}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.22)}
+.btn.sec{background:var(--papel);color:var(--tx);border:2px solid var(--borde);box-shadow:0 4px 0 var(--borde)}
+.btn.az{background:var(--azc);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{padding:6px 12px;border-radius:999px;border:2px solid var(--borde);background:var(--papel);cursor:pointer;font-size:14.5px;min-height:38px}
+.chip.act{background:var(--azc);border-color:var(--azc);color:#fff}
+.chip.ro.act{background:var(--ro);border-color:var(--ro)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:8px 0}
+.ctrl label{display:flex;align-items:center;gap:8px;font-size:15px}
+.ctrl input[type=range]{width:150px;accent-color:var(--azc)}
+select{padding:7px 10px;border-radius:12px;border:2px solid var(--borde);background:var(--papel)}
+.lienzo{position:relative;width:100%}
+.lienzo img{display:block;width:100%;height:auto;border-radius:16px}
+.lienzo svg.sobre{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+canvas.ecg{display:block;width:100%;border-radius:12px;background:var(--papel-ecg);touch-action:none}
+.letrero{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:46px;padding:8px 12px;border-radius:14px;background:var(--resalte);font-weight:600}
+.letrero .k{font-family:var(--f-tit);background:var(--az);color:#fff;border-radius:10px;padding:2px 10px;min-width:48px;text-align:center}
+.nota{font-size:14px;color:var(--tx2)}
+.lit{display:inline-block;font-size:12.5px;font-weight:700;color:var(--mo);border:1.5px solid var(--mo);border-radius:999px;padding:0 8px;margin-left:6px;vertical-align:.15em}
+.dato{color:var(--ro);font-weight:700}
+mark{background:#ffe98a;color:#1b1b1b;padding:0 3px;border-radius:3px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{border-bottom:1px solid var(--borde);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--az);font-family:var(--f-tit);font-weight:500}
+.pasos{counter-reset:p;display:grid;gap:6px;padding:0;margin:0;list-style:none}
+.pasos li{counter-increment:p;display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:14px;border:2px solid var(--borde);background:var(--papel);cursor:pointer}
+.pasos li::before{content:counter(p);flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--az);color:#fff;font-family:var(--f-tit)}
+.pasos li.act{border-color:var(--azc);background:color-mix(in srgb,var(--azc) 12%,var(--papel))}
+.tarj{background:var(--papel);border-radius:18px;box-shadow:var(--sombra);padding:12px 14px;border-left:6px solid var(--azc)}
+.tarj.ro{border-left-color:var(--ro)}.tarj.ve{border-left-color:var(--ve)}.tarj.mo{border-left-color:var(--mo)}.tarj.na{border-left-color:var(--na)}
+.tarj b.t{font-family:var(--f-tit);font-size:17px;color:var(--az);display:block}
+.opciones{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.opciones button{min-height:52px;text-align:left;padding:10px 14px;border-radius:16px;border:2px solid var(--borde);background:var(--papel);cursor:pointer;font-weight:600}
+.opciones button.bien{border-color:var(--ve);background:color-mix(in srgb,var(--ve) 16%,var(--papel))}
+.opciones button.mal{border-color:#EF4444;background:color-mix(in srgb,#EF4444 12%,var(--papel))}
+.hit{cursor:pointer}
+.eti{font-family:var(--f-tit);font-weight:600;paint-order:stroke;stroke:#fffaf0;stroke-width:7px;stroke-linejoin:round}
+.marcador{fill:var(--am);stroke:#1b1b1b;stroke-width:3}
+.info{min-height:80px}
+.kbd{font-family:var(--f-tit);background:var(--papel);border:2px solid var(--borde);border-radius:8px;padding:0 6px}
+.migas{margin:8px 0 0;font-size:15px}
+.pie{color:var(--tx2);font-size:13.5px;margin-top:40px;border-top:1px solid var(--borde);padding-top:10px}
+.seccion{display:none}.seccion.ver{display:block}
+@media (max-width:600px){main{padding:4px 12px 60px}.barra{padding:8px 12px}.marca span{display:none}.ctrl input[type=range]{width:110px}}
+
+/* ---- reglas propias del módulo de presión arterial ---- */
+.cv{display:block;width:100%;border-radius:14px;background:var(--papel);border:1px solid var(--borde);touch-action:none}
+.manometro{display:block;width:100%;max-width:340px;margin:0 auto}
+.manometro .cara{fill:var(--papel);stroke:var(--tx2);stroke-width:5}
+.manometro .tk{stroke:var(--tx);stroke-width:1.6}.manometro .tkm{stroke:var(--tx2);stroke-width:1}
+.manometro text{fill:var(--tx);font-family:var(--f-tit);font-size:11px;text-anchor:middle;dominant-baseline:middle}
+.manometro .aguja{stroke:var(--ro);stroke-width:3;stroke-linecap:round}
+.manometro .hub{fill:var(--tx)}
+.manometro .zona{fill:none;stroke-width:7;opacity:.55}
+.lamp{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.lamp i{width:14px;height:14px;border-radius:50%;background:var(--borde);display:inline-block;transition:background .05s}
+.lamp i.on{background:var(--ro);box-shadow:0 0 8px var(--ro)}
+.fases{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.fases span{flex:1 1 56px;text-align:center;padding:4px 6px;border-radius:10px;border:2px solid var(--borde);font-family:var(--f-tit);font-size:14px;background:var(--papel)}
+.fases span.act{background:var(--az);border-color:var(--az);color:#fff}
+.btn.grande{min-height:56px;font-size:18px;padding:10px 22px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.entrada{width:92px;min-height:44px;font-size:20px;font-family:var(--f-tit);text-align:center;border-radius:12px;border:2px solid var(--borde);background:var(--papel)}
+.res{display:grid;gap:6px}.res .fila{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed var(--borde)}
+.cat{display:inline-block;padding:3px 12px;border-radius:999px;font-family:var(--f-tit);color:#fff;background:var(--az)}
+.cat.c0{background:#16A34A}.cat.c1{background:#65A30D}.cat.c2{background:#CA8A04}.cat.c3{background:#EA580C}.cat.c4{background:#DC2626}.cat.c5{background:#7F1D1D}.cat.hipo{background:#2563EB}
+.discrep{border-left:6px solid var(--na);background:color-mix(in srgb,var(--na) 14%,var(--papel));padding:8px 12px;border-radius:12px;margin:8px 0}
+.barras{display:flex;gap:18px;align-items:flex-end;height:210px;padding:6px 10px;border-radius:14px;background:var(--papel);border:1px solid var(--borde);position:relative}
+.barra-v{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative}
+.barra-v div.col{width:100%;max-width:90px;border-radius:10px 10px 0 0;transition:height .12s}
+.barra-v b{font-family:var(--f-tit);font-size:20px}
+input[type=range].largo{width:100%;max-width:340px;min-height:36px}
+.slid{display:grid;grid-template-columns:140px 1fr 78px;gap:8px;align-items:center;margin:6px 0}
+.slid input{width:100%;accent-color:var(--azc);min-height:34px}.slid output{font-family:var(--f-tit);text-align:right}
+@media (max-width:600px){.slid{grid-template-columns:1fr 70px}.slid label{grid-column:1/-1}}
+.cadena{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.cadena span.n{padding:6px 10px;border-radius:12px;border:2px solid var(--borde);background:var(--papel)}
+.cadena span.f{color:var(--az);font-weight:700}
+.efecto{padding:6px 10px;border-radius:12px;margin:4px 0;border-left:5px solid var(--borde);background:var(--papel)}
+.efecto.mas{border-left-color:var(--ro)}.efecto.menos{border-left-color:var(--azc)}
+.aviso-snd{font-size:13.5px;color:var(--tx2)}
+.prep label{flex-direction:column;align-items:stretch;gap:2px;font-weight:600;font-size:14px}.prep select{width:100%;min-width:0;font-weight:400}
+</style>
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="../../#/">🩸 <b>Presión arterial</b> <span>· Atlas de Fisiopatología</span></a>
+  <nav><a href="../../#/">← Atlas</a><button id="tema-btn" title="Tema claro u oscuro">🌓</button></nav>
+</header>
+<nav class="tabs" id="tabs">
+  <a href="#toma">🩺 Toma la presión</a><a href="#clasificacion">📊 Clasificación</a><a href="#determinantes">⚙️ Determinantes</a>
+  <a href="#explicacion">📖 Explicación</a><a href="#prueba">🎯 Ponte a prueba</a>
+</nav>
+<main id="vista"></main>
+<script src="motor.js"></script>
+<script src="app.js"></script>
+<script src="secciones.js"></script>
+</body>
+</html>

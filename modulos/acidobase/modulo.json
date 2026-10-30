@@ -1,0 +1,7 @@
+{
+ "titulo": "Gasometría y ácido-base",
+ "icono": "⚗️",
+ "descripcion": "Simulador de gasometría: mueve pH, PaCO₂ y HCO₃⁻ ligados por Henderson-Hasselbalch, mira la balanza pulmón-riñón, anima los cuatro trastornos con su compensación, calcula el anión gap con gamblegrama, lee una gasometría en pasos y ponte a prueba con casos al azar.",
+ "laminas": [7, 8, 41],
+ "enlace_lamina": "⚗️ Simulador Gasometría"
+}

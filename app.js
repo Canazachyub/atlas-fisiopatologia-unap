@@ -322,7 +322,7 @@
     if ((A.modulos || []).length) {   // módulos interactivos (simuladores) del curso
       h += `<h2>🧪 Módulos interactivos</h2><div class="grid-lam">`;
       for (const m of A.modulos)
-        h += `<a class="tarj" href="${m.href}"><div class="mini" style="background-image:url('${m.mini}')"><span>${m.icono} Simulador</span></div>
+        h += `<a class="tarj" href="${m.href}">${m.mini ? `<div class="mini" style="background-image:url('${m.mini}')">` : `<div class="mini sin"><i>${m.icono}</i>`}<span>${m.icono} Simulador</span></div>
           <div class="cuerpo"><b>${m.icono} ${m.titulo}</b><div class="meta" style="display:block">${m.descripcion}</div></div></a>`;
       h += "</div>";
     }

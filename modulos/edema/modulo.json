@@ -1,0 +1,7 @@
+{
+ "titulo": "Starling y edema",
+ "icono": "💧",
+ "descripcion": "Simulador del capilar: mueve presión hidrostática, albúmina, permeabilidad, presión intersticial y drenaje linfático y mira el agua salir y entrar; el intersticio se hincha cuando la filtración supera a la linfa. Incluye las causas de edema de la clase (corazón, cirrosis, nefrótico, nefrítico, EAP cardiogénico y de altura…), la fóvea por grados y casos para ponerte a prueba.",
+ "laminas": [2, 21, 23, 24],
+ "enlace_lamina": "💧 Simulador Starling y edema"
+}

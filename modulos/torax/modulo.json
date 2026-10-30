@@ -1,0 +1,11 @@
+{
+ "titulo": "Síndromes pleuropulmonares",
+ "icono": "🫁",
+ "descripcion": "Paciente virtual con tórax por delante y por detrás: elige el síndrome y el lado, examina con inspección, palpación, percusión y auscultación (con sonidos sintetizados) y mira por dentro el líquido, el aire, la condensación o el colapso. Tabla comparativa, catálogo de ruidos agregados y autoevaluación.",
+ "laminas": [
+  1,
+  27,
+  41
+ ],
+ "enlace_lamina": "🫁 Simulador de síndromes pleuropulmonares"
+}
