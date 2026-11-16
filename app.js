@@ -14,12 +14,52 @@
     const r = b.parentNode.querySelector(".mem-resp"); r.hidden = !r.hidden; b.textContent = r.hidden ? "Ver respuesta" : "Ocultar";
   });
   /* ---------- progreso (localStorage, con respaldo en memoria) ---------- */
-  const CLAVE = "atlas-semio-v1"; let mem = {};
+  // cada atlas guarda su progreso aparte (los dos viven en el mismo dominio de GitHub Pages);
+  // Semiología conserva la clave de siempre y los demás copian una vez lo que tuvieran en ella
+  const VIEJA = "atlas-semio-v1";
+  const CLAVE = /semiolog/i.test(A.titulo) ? VIEJA : "atlas-v1-" + A.titulo.normalize("NFD").replace(/[^\w]+/g, "-").toLowerCase();
+  try { if (CLAVE !== VIEJA && !localStorage.getItem(CLAVE) && localStorage.getItem(VIEJA)) {
+    const o = JSON.parse(localStorage.getItem(VIEJA)); delete o.ruta; delete o.srs; delete o.srsMigrado; delete o.dias; delete o.inicio; delete o.examen;
+    localStorage.setItem(CLAVE, JSON.stringify(o)); } } catch (e) {}
+  let mem = {};
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE)) || {}; } catch (e) { return mem; } }
   function guardar(o) { mem = o; try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
   let P = leer();
   const marca = id => (P.q || {})[id];
-  function marcar(id, v) { P.q = P.q || {}; if (P.q[id] === v) delete P.q[id]; else P.q[id] = v; guardar(P); }
+  function marcar(id, v) { P.q = P.q || {}; if (P.q[id] === v) delete P.q[id]; else P.q[id] = v; guardar(P);
+    if (P.q[id]) calificar(id, P.q[id] === "ok" ? "bien" : "otra"); }
+
+  /* ---------- repetición espaciada (skill estudio-repeticion-espaciada, «regla de intervalos para el MODO REPASO») ----------
+     Escalera [1,3,7,15,30,60,120] días. Otra vez → escalón 0 · Difícil → baja 1 · Bien → sube 1 · Fácil → sube 2.
+     Pregunta nueva entra en −1 (Bien → mañana, Fácil → 3 días). Solo la primera respuesta del día mueve el calendario;
+     las siguientes son rondas (salvo el semáforo del repaso de hoy, que puede corregir la nota del día).
+     Dominada = escalón ≥ 3 (≥ 15 días). 3 fallos seguidos = «reescríbela o recodifícala». Con fecha de examen, ningún
+     repaso cae después de la víspera. */
+  const ESC = [1, 3, 7, 15, 30, 60, 120];
+  const fecha = (d, base) => { const x = base ? new Date(base + "T12:00:00") : new Date(); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+  const hoy = () => fecha(0);
+  const diasHasta = f => Math.round((new Date(f + "T12:00:00") - new Date(hoy() + "T12:00:00")) / 864e5);
+  const srs = id => (P.srs || {})[id];
+  function calificar(id, nota, corrige) {
+    P.srs = P.srs || {}; const t = hoy(); let s = P.srs[id] || { e: -1, f: 0 };
+    if (s.u === t && !corrige) return s;                          // ya se calificó hoy: esto es una ronda
+    const base = s.u === t && s.prev ? s.prev : { e: s.e, f: s.f || 0 };
+    let e = base.e;
+    e = nota === "otra" ? 0 : nota === "dificil" ? Math.max(0, e - 1) : nota === "bien" ? e + 1 : e + 2;
+    e = Math.min(ESC.length - 1, Math.max(0, e));
+    let d = fecha(ESC[e]);
+    if (P.examen) { const v = fecha(-1, P.examen); if (v > t && d > v) d = v; }
+    const f = nota === "otra" || nota === "dificil" ? base.f + 1 : 0;
+    P.srs[id] = { e, d, u: t, f, prev: base };
+    P.q = P.q || {}; P.q[id] = nota === "bien" || nota === "facil" ? "ok" : "mal";
+    P.dias = P.dias || {}; if (s.u !== t) P.dias[t] = (P.dias[t] || 0) + 1;
+    guardar(P); return P.srs[id];
+  }
+  // progreso anterior (solo ✓/✗, sin fechas): lo marcado para repasar vence hoy; lo sabido, en 3 días
+  if (P.q && !P.srsMigrado) { P.srs = P.srs || {};
+    for (const [id, v] of Object.entries(P.q)) if (!P.srs[id]) P.srs[id] = v === "ok" ? { e: 1, d: fecha(3), u: "", f: 0 } : { e: 0, d: hoy(), u: "", f: 1 };
+    P.srsMigrado = 1; guardar(P); }
+  if (!P.inicio) { P.inicio = hoy(); guardar(P); }
 
   /* ---------- tema ---------- */
   function aplicaTema() { if (P.tema) document.documentElement.dataset.theme = P.tema; }
@@ -92,6 +132,39 @@
   const exBadge = q => (q.ex || []).length ? `<span class="badge bx" title="${q.ex.join(" · ")}">📝 Examen${q.ex.length > 1 ? " ×" + q.ex.length : ""}</span>` : "";
   function grupoDe(l) { return A.grupos.find(g => g.id === l.grupo) || A.grupos[0]; }
   function progresoLamina(l) { const ok = l.preguntas.filter(q => marca(q.id) === "ok").length; return [ok, l.preguntas.length]; }
+  /* ---------- orden del curso ----------
+     Las láminas se numeraron según se hicieron, no según el curso. El orden de estudio es: grupo (el de curso.json)
+     y, dentro del grupo, la primera clase que cita la fuente (05a < 05b < 08a < 08a2); a igualdad, el número. */
+  const claveCurso = l => ((l.fuente || "").replace(/<[^>]+>/g, " ").match(/\b\d{2}[a-l]?\d?\b/) || ["99"])[0];
+  const ORDEN = A.grupos.flatMap(g => A.laminas.filter(l => l.grupo === g.id)
+    .sort((a, b) => claveCurso(a).localeCompare(claveCurso(b), "es", { numeric: true }) || a.n - b.n));
+  A.laminas.forEach(l => { if (!ORDEN.includes(l)) ORDEN.push(l); });
+  const vecino = (l, d) => ORDEN[ORDEN.indexOf(l) + d];
+  const lamDe = g => ORDEN.filter(l => l.grupo === g.id);
+  // cada simulador va con el grupo de la primera lámina que lo usa
+  const modsDe = g => (A.modulos || []).filter(m => (m.laminas || []).some(n => porN[n]) && grupoDe(porN[(m.laminas || []).find(n => porN[n])]).id === g.id);
+  const pct = (o, t) => t ? Math.round(o / t * 100) : 0;
+
+  /* ---------- ruta de estudio de cada lámina (skill estudiar: entender → memorizar → repasar) ----------
+     Pasos: ver la imagen · entenderla (comprensiómetro ≥ 7) · el mecanismo o el mapa · recordar los datos duros ·
+     preguntarse sin mirar. Un paso queda hecho al leerlo; «Entiéndelo» exige además puntuarse ≥ 7, y «Preguntas»
+     que todas tengan ya una primera respuesta. */
+  function pasosDe(l) {
+    const ps = [{ id: "imagen", ic: "🖼️", t: "Mira la imagen" }];
+    if (l.entender) ps.push({ id: "entender", ic: "📖", t: "Entiéndelo" });
+    if (l.cadena) ps.push({ id: "cadena", ic: "⚙️", t: "Mecanismo" }); else if (l.esquema) ps.push({ id: "esquema", ic: "🗺️", t: "Mapa del tema" });
+    if (l.memoria && l.memoria.length) ps.push({ id: "memoria", ic: "🧠", t: "Datos duros" });
+    ps.push({ id: "preguntas", ic: "❓", t: "Pregúntate" });
+    const r = (P.ruta || {})[l.n] || {}, comp = (P.comp || {})[l.n] || 0;
+    for (const p of ps) p.hecho = p.id === "entender" ? !!r.entender && comp >= 7 : p.id === "preguntas" ? l.preguntas.every(q => srs(q.id)) : !!r[p.id];
+    return ps;
+  }
+  const estadoLam = l => { const ps = pasosDe(l), h = ps.filter(p => p.hecho).length; return { ps, h, total: ps.length, sig: ps.find(p => !p.hecho) }; };
+  function visto(l, id) { P.ruta = P.ruta || {}; const r = P.ruta[l.n] = P.ruta[l.n] || {}; if (!r[id]) { r[id] = hoy(); guardar(P); return true; } return false; }
+  const vencidas = () => unicas().filter(x => { const s = srs(x.q.id); return s && s.d <= hoy(); });
+  const proximo = () => { const ds = unicas().map(x => srs(x.q.id)).filter(s => s && s.d > hoy()).map(s => s.d).sort(); return ds.length ? [ds[0], ds.filter(d => d === ds[0]).length] : null; };
+  const dominadas = () => unicas().filter(x => (srs(x.q.id) || {}).e >= 3).length;
+  const fFecha = f => new Date(f + "T12:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
   // convierte ① en enlaces a preguntas y prepara las letras amarillas
   function enlazar(root, l) {
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -277,15 +350,69 @@
     $$(".barra nav a").forEach(a => a.classList.toggle("act", (h[0] || "inicio") === a.dataset.nav || (h[0] === "" && a.dataset.nav === "inicio")));
     detenerTodo();
     if (h[0] === "l" && porN[+h[1]]) vistaLamina(porN[+h[1]], h[2]);
+    else if (h[0] === "hoy") vistaHoy();
     else if (h[0] === "repaso") vistaRepaso(h[1]);
     else if (h[0] === "examen" && (A.resueltos || []).some(x => x.id === h[1])) vistaResuelto(A.resueltos.find(x => x.id === h[1]));
     else vistaInicio();
     if (h[0] !== "l" || !h[2]) window.scrollTo(0, 0);
+    if (h[0] === "grupo") { const s = document.getElementById("g-" + h[1]); if (s) setTimeout(() => s.scrollIntoView(), 30); }
+    marcarIndice(h);
+  }
+
+  /* ---------- índice lateral (PC): todo el curso en orden, siempre a la vista ----------
+     En pantallas anchas queda fijo a la izquierda; en tablet y celular se abre con ☰ como cajón. */
+  const indice = document.createElement("aside");
+  indice.id = "indice"; indice.setAttribute("aria-label", "Índice del curso");
+  document.body.insertBefore(indice, $("main"));
+  const velo = document.createElement("div"); velo.id = "indice-velo"; document.body.appendChild(velo);
+  {
+    const b = document.createElement("button"); b.id = "indice-btn"; b.title = "Mostrar u ocultar el índice"; b.textContent = "☰";
+    const bar = $(".barra"); bar.insertBefore(b, bar.firstChild);
+    const ancho = () => matchMedia("(min-width:1200px)").matches;
+    b.onclick = () => {
+      if (ancho()) { P.sinIndice = !P.sinIndice; guardar(P); document.body.classList.toggle("sin-indice", !!P.sinIndice); }
+      else document.body.classList.toggle("indice-abierto");
+    };
+    velo.onclick = () => document.body.classList.remove("indice-abierto");
+    if (P.sinIndice) document.body.classList.add("sin-indice");
+    const alto = () => document.documentElement.style.setProperty("--barra", bar.offsetHeight + "px");
+    alto(); addEventListener("resize", alto);
+  }
+  function pintarIndice() {
+    const abiertos = new Set($$("details[open]", indice).map(d => d.dataset.g));
+    const primero = !indice.innerHTML;
+    let h = `<input class="ind-buscar" id="ind-buscar" placeholder="Filtrar láminas…" autocomplete="off">
+      <div class="ind-acc"><a href="#/" data-r="inicio">🏠 Inicio</a><a href="#/hoy" data-r="hoy" class="${vencidas().length ? "urge" : ""}">📅 Hoy${vencidas().length ? ` <b>${vencidas().length}</b>` : ""}</a><a href="#/repaso" data-r="repaso">🔥 Repaso</a>${unicas().some(x => (x.q.ex || []).length) ? `<a href="#/repaso/examen" data-r="repaso/examen">📝 Simulacro</a>` : ""}</div>`;
+    A.grupos.forEach((g, gi) => {
+      const ls = lamDe(g); if (!ls.length) return;
+      const o = ls.reduce((s, l) => s + progresoLamina(l)[0], 0), t = ls.reduce((s, l) => s + l.preguntas.length, 0);
+      h += `<details data-g="${g.id}"${primero || abiertos.has(g.id) ? " open" : ""}><summary><span class="g-num">${gi + 1}</span><span class="ind-g">${g.icono} ${g.nombre}</span><small>${pct(o, t)}%</small></summary><ol>
+        ${ls.map(l => { const [a, b] = progresoLamina(l); return `<li><a href="#/l/${l.n}" data-n="${l.n}"><span class="ind-t">${l.titulo}</span>${(() => { const e = estadoLam(l), v = l.preguntas.filter(q => { const s = srs(q.id); return s && s.d <= hoy(); }).length; return `${v ? `<span class="ind-v" title="${v} para repasar hoy">📅${v}</span>` : ""}<span class="ind-r${!e.sig ? " lleno" : e.h ? " medio" : ""}" title="Ruta: ${e.h} de ${e.total} pasos">${!e.sig ? "✓" : e.h + "/" + e.total}</span>`; })()}</a></li>`; }).join("")}
+        ${modsDe(g).map(m => `<li class="ind-mod"><a href="${m.href}">${m.icono} ${m.titulo}</a></li>`).join("")}</ol></details>`;
+    });
+    if ((A.resueltos || []).length) h += `<details data-g="_ex"${abiertos.has("_ex") ? " open" : ""}><summary><span class="g-num">📝</span><span class="ind-g">Exámenes resueltos</span></summary><ol>
+      ${A.resueltos.map(x => `<li><a href="#/examen/${x.id}" data-r="examen/${x.id}"><span class="ind-t">${x.titulo}</span></a></li>`).join("")}</ol></details>`;
+    indice.innerHTML = h;
+    const f = $("#ind-buscar", indice);
+    f.oninput = () => { const t = norm(f.value.trim());
+      $$("details", indice).forEach(d => { let alguno = false;
+        $$("li", d).forEach(li => { const ok = !t || norm(li.textContent).includes(t); li.hidden = !ok; alguno = alguno || ok; });
+        d.hidden = !alguno; if (t && alguno) d.open = true; }); };
+    indice.onclick = ev => { if (ev.target.closest("a")) document.body.classList.remove("indice-abierto"); };
+  }
+  function marcarIndice(h) {
+    pintarIndice();   // se repinta para que el avance (✓) quede al día
+    const r = h.join("/"), n = h[0] === "l" ? h[1] : null;
+    let act = n ? $(`a[data-n="${n}"]`, indice) : $(`a[data-r="${h[0] === "repaso" ? r.replace(/\/$/, "") : h[0] === "examen" ? r : h[0] === "hoy" ? "hoy" : "inicio"}"]`, indice);
+    if (!act && h[0] === "grupo") act = $(`details[data-g="${h[1]}"] summary`, indice);
+    if (act) { act.classList.add("act"); const d = act.closest("details"); if (d) d.open = true;
+      const top = act.getBoundingClientRect().top, alto = indice.clientHeight;
+      if (top < 80 || top > alto - 40) act.scrollIntoView({ block: "center" }); }
   }
   addEventListener("hashchange", ruta);
   let timers = [];
   let teclas = [];
-  function detenerTodo() { timers.forEach(clearTimeout); timers = []; teclas = []; document.onkeydown = null; ocultar();
+  function detenerTodo() { window.__ruta = null; timers.forEach(clearTimeout); timers = []; teclas = []; document.onkeydown = null; ocultar();
     if (window.__espia) { removeEventListener("scroll", window.__espia); window.__espia = null; } }
   // los atajos no deben pisar Ctrl+C, Alt+←, escribir en el buscador ni el espacio sobre un botón enfocado
   const sinAtajo = ev => ev.ctrlKey || ev.metaKey || ev.altKey || ev.target.tagName === "INPUT" ||
@@ -309,8 +436,51 @@
       <div class="stat"><b>${ok}</b><span>ya dominas</span><div class="barra-prog"><i style="width:${(ok / todas.length * 100).toFixed(1)}%"></i></div></div></div></section>
       <input class="buscar" id="buscar" placeholder="🔎 Busca en las ${todas.length} preguntas (p. ej. ${A.ejemplos || "«Damoiseau», «galope», «facies»"})…" autocomplete="off">
       <div class="resultados" id="resultados"></div>`;
+    // plan de hoy (skills estudio-repeticion-espaciada y estudio-estrategia-examen): repasar lo vencido primero,
+    // luego avanzar una lámina nueva en el orden del curso; con fecha de examen, ritmo y fase de simulacro
+    {
+      const ven = vencidas().length, prox = proximo(), sigL = ORDEN.find(l => estadoLam(l).sig), dom = dominadas();
+      const dias = P.examen ? diasHasta(P.examen) : null, total = Math.max(1, P.examen ? diasHasta(P.examen) + diasHasta(P.inicio) * -1 : 1);
+      const pend = ORDEN.filter(l => estadoLam(l).sig).length;
+      const fase = dias !== null && dias >= 0 && (dias <= 3 || dias <= total * 0.2);
+      const ritmo = dias !== null && dias > 0 ? Math.ceil(pend / Math.max(1, Math.floor(dias * 0.8))) : null;
+      const racha = (() => { let n = 0; for (let d = 0; (P.dias || {})[fecha(-d)]; d++) n++; if (!n && (P.dias || {})[fecha(-1)]) for (let d = 1; (P.dias || {})[fecha(-d)]; d++) n++; return n; })();
+      const st = sigL ? estadoLam(sigL) : null;
+      h += `<section class="plan-hoy"><h2>📅 Tu plan de hoy <small>${fFecha(hoy())}${racha > 1 ? ` · 🔥 ${racha} días seguidos estudiando` : racha ? " · 🔥 hoy ya estudiaste" : ""}</small></h2><div class="plan-grid">
+        <a class="plan-c rep${ven ? " urge" : ""}" href="#/hoy"><span class="plan-n">1</span><b>${ven ? `Repasa ${ven} pregunta${ven > 1 ? "s" : ""} vencida${ven > 1 ? "s" : ""}` : "Nada vencido hoy"}</b>
+          <small>${ven ? "Primero esto: recuerdo activo con semáforo y rondas hasta cero errores." : prox ? `Próximo repaso: ${fFecha(prox[0])} (${prox[1]}).` : "Responde preguntas de una lámina y aquí aparecerán sus repasos."}</small>
+          <span class="plan-btn">${ven ? "▶ Empezar repaso" : "Ver repaso"}</span></a>
+        ${fase ? `<a class="plan-c sim" href="#/repaso/examen"><span class="plan-n">2</span><b>Fase de simulacro</b><small>Faltan ${dias} día${dias === 1 ? "" : "s"}: no entres láminas nuevas; haz simulacros y repasa los errores.</small><span class="plan-btn">📝 Simulacro</span></a>`
+        : sigL ? `<a class="plan-c nueva" href="#/l/${sigL.n}/${st.sig.id}"><span class="plan-n">2</span><b>${st.h ? "Sigue" : "Empieza"}: ${sigL.titulo}</b>
+          <small>${grupoDe(sigL).icono} ${grupoDe(sigL).nombre} · paso ${st.h + 1} de ${st.total}: ${st.sig.ic} ${st.sig.t}</small><span class="plan-btn">▶ Continuar</span></a>`
+        : `<div class="plan-c nueva"><span class="plan-n">2</span><b>Recorriste todas las láminas</b><small>Ahora toca repasar y hacer simulacros.</small></div>`}
+        <div class="plan-c exa"><span class="plan-n">3</span><b>${dias === null ? "¿Cuándo es tu examen?" : dias < 0 ? "El examen ya pasó" : `Examen en ${dias} día${dias === 1 ? "" : "s"}`}</b>
+          <small>${ritmo ? `Ritmo: ${ritmo} lámina${ritmo > 1 ? "s" : ""} nueva${ritmo > 1 ? "s" : ""} por día (${pend} pendientes) y el último 20 % solo simulacros.` : dias === null ? "Con la fecha, los repasos no caen después de la víspera y te digo el ritmo." : ""}</small>
+          <label class="plan-fecha">📆 <input type="date" id="f-examen" value="${P.examen || ""}" min="${hoy()}"></label></div>
+        <div class="plan-c dom"><span class="plan-n">✓</span><b>${dom} de ${todas.length} dominadas</b><small>Dominada = la acertaste en repasos espaciados hasta llegar a 15 días o más.</small>
+          <div class="barra-prog"><i style="width:${pct(dom, todas.length)}%"></i></div></div>
+      </div></section>`;
+    }
+    // mapa del curso: un botón por grupo, en el orden del curso, con su avance
+    h += `<nav class="mapa-curso" aria-label="Temas del curso">${A.grupos.filter(g => lamDe(g).length).map((g, i) => {
+      const ls = lamDe(g), o = ls.reduce((s, l) => s + progresoLamina(l)[0], 0), t = ls.reduce((s, l) => s + l.preguntas.length, 0);
+      return `<a href="#" data-g="${g.id}"><i>${i + 1}</i><span>${g.icono} ${g.nombre}</span><small>${ls.length} lámina${ls.length > 1 ? "s" : ""} · ${pct(o, t)}%</small></a>`; }).join("")}</nav>`;
+    A.grupos.forEach((g, gi) => {
+      const ls = lamDe(g); if (!ls.length) return;
+      h += `<section class="grupo-sec" id="g-${g.id}"><h2><span class="g-num">${gi + 1}</span>${g.icono} ${g.nombre} <small>${ls.length} lámina${ls.length > 1 ? "s" : ""} · ${ls.reduce((s, l) => s + l.preguntas.length, 0)} preguntas</small></h2><div class="grid-lam">`;
+      ls.forEach((l, k) => {
+        const [o, t] = progresoLamina(l), f3 = l.preguntas.filter(q => q.veces >= 3).length, fx = l.preguntas.filter(q => (q.ex || []).length).length;
+        h += `<a class="tarj" href="#/l/${l.n}"><div class="mini" style="background-image:url('${l.mini || l.img}')"><span>${gi + 1}.${k + 1} · Lámina ${l.n}</span></div>
+          <div class="cuerpo"><b>${l.titulo}</b><div class="meta"><span>❓ ${t} preguntas</span>${f3 ? `<span>🔥 ${f3}</span>` : ""}${fx ? `<span>📝 ${fx}</span>` : ""}<span>✓ ${o}</span></div>
+          <div class="barra-prog"><i style="width:${(o / t * 100).toFixed(0)}%"></i></div></div></a>`;
+      });
+      h += "</div>";
+      const ms = modsDe(g);
+      if (ms.length) h += `<div class="g-mods"><span>🧪 Simuladores de este tema:</span>${ms.map(m => `<a href="${m.href}">${m.icono} ${m.titulo}</a>`).join("")}</div>`;
+      h += "</section>";
+    });
     if ((A.resueltos || []).length) {
-      h += `<h2>📝 Exámenes resueltos</h2><div class="grid-exr">`;
+      h += `<h2 id="examenes">📝 Exámenes resueltos</h2><div class="grid-exr">`;
       for (const x of A.resueltos) {
         const ok = x.preguntas.filter(q => marca(q.id) === "ok").length;
         h += `<a class="tarj exr" href="#/examen/${x.id}"><div class="cuerpo"><b>${x.icono} ${x.titulo}</b>
@@ -320,24 +490,15 @@
       h += "</div>";
     }
     if ((A.modulos || []).length) {   // módulos interactivos (simuladores) del curso
-      h += `<h2>🧪 Módulos interactivos</h2><div class="grid-lam">`;
+      h += `<h2 id="simuladores">🧪 Todos los simuladores</h2><div class="grid-lam">`;
       for (const m of A.modulos)
         h += `<a class="tarj" href="${m.href}">${m.mini ? `<div class="mini" style="background-image:url('${m.mini}')">` : `<div class="mini sin"><i>${m.icono}</i>`}<span>${m.icono} Simulador</span></div>
           <div class="cuerpo"><b>${m.icono} ${m.titulo}</b><div class="meta" style="display:block">${m.descripcion}</div></div></a>`;
       h += "</div>";
     }
-    for (const g of A.grupos) {
-      const ls = A.laminas.filter(l => l.grupo === g.id); if (!ls.length) continue;
-      h += `<h2>${g.icono} ${g.nombre}</h2><div class="grid-lam">`;
-      for (const l of ls) {
-        const [o, t] = progresoLamina(l), f3 = l.preguntas.filter(q => q.veces >= 3).length, fx = l.preguntas.filter(q => (q.ex || []).length).length;
-        h += `<a class="tarj" href="#/l/${l.n}"><div class="mini" style="background-image:url('${l.mini || l.img}')"><span>Lámina ${l.n}</span></div>
-          <div class="cuerpo"><b>${l.titulo}</b><div class="meta"><span>❓ ${t} preguntas</span>${f3 ? `<span>🔥 ${f3}</span>` : ""}${fx ? `<span>📝 ${fx}</span>` : ""}<span>✓ ${o}</span></div>
-          <div class="barra-prog"><i style="width:${(o / t * 100).toFixed(0)}%"></i></div></div></a>`;
-      }
-      h += "</div>";
-    }
     vista.innerHTML = h;
+    { const fx = $("#f-examen"); if (fx) fx.onchange = () => { P.examen = fx.value || ""; if (!P.examen) delete P.examen; guardar(P); vistaInicio(); marcarIndice([""]); }; }
+    $$(".mapa-curso a").forEach(a => a.onclick = ev => { ev.preventDefault(); const s = document.getElementById("g-" + a.dataset.g); s && s.scrollIntoView({ behavior: "smooth" }); });
     const inp = $("#buscar"), res = $("#resultados");
     inp.oninput = () => {
       const t = norm(inp.value.trim()); if (t.length < 3) { res.innerHTML = ""; return; }
@@ -380,7 +541,7 @@
       if (b) { b.scrollIntoView({ behavior: "smooth", block: "center" }); b.classList.remove("brilla"); void b.offsetWidth; b.classList.add("brilla"); } });
     $$(".ent-ver").forEach(b => b.onclick = () => { SON.tick(); const r = b.nextElementSibling; r.hidden = !r.hidden; b.textContent = r.hidden ? "Ver respuesta" : "Ocultar"; });
     $$(".ent-esc button").forEach(b => b.onclick = () => { SON.tick(); const v = +b.dataset.v; P.comp = P.comp || {}; P.comp[l.n] = v; guardar(P);
-      $$(".ent-esc button").forEach(x => x.classList.toggle("on", +x.dataset.v <= v)); $("#ent-msg").innerHTML = compMsg(v); if (v >= 10) chispas(b); });
+      $$(".ent-esc button").forEach(x => x.classList.toggle("on", +x.dataset.v <= v)); $("#ent-msg").innerHTML = compMsg(v); if (v >= 10) chispas(b); visto(l, "entender"); if (window.__ruta) window.__ruta(); });
   }
   /* ---------- esquema draw.io del tema completo (imagen con zoom + PDF vectorial) ---------- */
   function esquemaHTML(l) {
@@ -472,12 +633,15 @@
   }
 
   function vistaLamina(l, sub) {
-    const g = grupoDe(l);
-    let h = `<div class="migas"><a href="#/">← Láminas</a> · ${g.icono} ${g.nombre}</div>
+    const g = grupoDe(l), gi = A.grupos.indexOf(g), hermanas = lamDe(g), k = hermanas.indexOf(l), ant = vecino(l, -1), sig = vecino(l, 1);
+    const mods = (A.modulos || []).filter(m => (m.laminas || []).includes(l.n));
+    // pestañas en el mismo orden en que aparecen las secciones: ver → entender → mecanismo → mapa → comparar → medir → recordar → preguntarse
+    let h = `<div class="migas"><a href="#/">Inicio</a> › <a href="#/grupo/${g.id}">${gi + 1}. ${g.icono} ${g.nombre}</a> › <span>Lámina ${k + 1} de ${hermanas.length} del tema</span></div>
       <h1>Lámina ${l.n} · ${l.titulo} <small>${l.subtitulo}</small></h1><div class="lema">${l.lema}</div>
-      <nav class="pestanas"><a href="#/l/${l.n}/imagen">🖼️ Imagen</a>${l.entender ? `<a href="#/l/${l.n}/entender">📖 Entiéndelo</a>` : ""}${l.cadena ? `<a href="#/l/${l.n}/cadena">⚙️ ${l.cadena.titulo}</a>` : ""}${l.esquema ? `<a href="#/l/${l.n}/esquema">🗺️ Esquema</a>` : ""}${l.memoria && l.memoria.length ? `<a href="#/l/${l.n}/memoria">🧠 Recordarlo</a>` : ""}
-      <a href="#/l/${l.n}/preguntas">❓ Preguntas <span class="prog" id="prog-l">${progresoLamina(l)[0]}/${l.preguntas.length} ✓</span></a>${l.escalas && l.escalas.length ? `<a href="#/l/${l.n}/escalas">📏 Escalas (${l.escalas.length})</a>` : ""}${l.tabla ? `<a href="#/l/${l.n}/tabla">📋 Tabla</a>` : ""}${(A.modulos || []).filter(m => (m.laminas || []).includes(l.n)).map(m => `<a href="${m.href}">${m.enlace}</a>`).join("")}
-      ${l.n > 1 && porN[l.n - 1] ? `<a class="nav-l" href="#/l/${l.n - 1}" title="${porN[l.n - 1].titulo}">← ${l.n - 1}</a>` : ""}${porN[l.n + 1] ? `<a class="nav-l" href="#/l/${l.n + 1}" title="${porN[l.n + 1].titulo}">${l.n + 1} →</a>` : ""}</nav>
+      <div class="ruta-est" id="ruta-est"></div>
+      <nav class="pestanas"><a href="#/l/${l.n}/imagen">🖼️ Imagen</a>${l.entender ? `<a href="#/l/${l.n}/entender">📖 Entiéndelo</a>` : ""}${l.cadena ? `<a href="#/l/${l.n}/cadena">⚙️ ${l.cadena.titulo}</a>` : ""}${l.esquema ? `<a href="#/l/${l.n}/esquema">🗺️ Esquema</a>` : ""}${l.tabla ? `<a href="#/l/${l.n}/tabla">📋 Tabla</a>` : ""}${l.escalas && l.escalas.length ? `<a href="#/l/${l.n}/escalas">📏 Escalas (${l.escalas.length})</a>` : ""}${l.memoria && l.memoria.length ? `<a href="#/l/${l.n}/memoria">🧠 Recordarlo</a>` : ""}
+      <a href="#/l/${l.n}/preguntas">❓ Preguntas <span class="prog" id="prog-l">${progresoLamina(l)[0]}/${l.preguntas.length} ✓</span></a>${mods.map(m => `<a class="p-mod" href="${m.href}">${m.enlace}</a>`).join("")}
+      ${ant ? `<a class="nav-l" href="#/l/${ant.n}" title="Anterior: ${ant.titulo}">←</a>` : ""}${sig ? `<a class="nav-l" href="#/l/${sig.n}" title="Siguiente: ${sig.titulo}">→</a>` : ""}</nav>
       <section id="imagen" class="zona"><div><div class="marco">
         <div class="controles"><button class="btn chico" id="b-tour">▶ Recorrer</button><button class="btn chico sec" id="b-quiz">🎯 ¿Dónde está?</button>
         <button class="btn chico sec" id="b-ocultar">👁️ Ocultar etiquetas</button><span class="quiz-msg" id="quiz-msg"></span></div>
@@ -492,8 +656,8 @@
         ${l.lado.recordar ? `<div class="recordar"><div class="ic">🧠</div><div><h3>Para recordar</h3><p>${l.lado.recordar}</p></div></div>` : ""}
         ${l.numeros.length ? `<div class="nums"><h3>🔢 Números clave <small>toca una letra para verla en la imagen</small></h3>
           <div class="numgrid">${l.numeros.map(x => `<div class="ncard" data-l="${x.l}"><span class="lt grande">${x.l}</span><div class="ntx">${x.html}${x.rango ? regla(x.rango) : ""}</div></div>`).join("")}</div></div>` : ""}
-      </section>` : ""}
-      ${l.escalas && l.escalas.length ? `<h2 id="escalas">📏 Escalas que se aplican</h2><div class="escgrid">${l.escalas.map(escalaHTML).join("")}</div>` : ""}`;
+      </section>` : ""}`;
+    const escH = l.escalas && l.escalas.length ? `<h2 id="escalas">📏 Escalas que se aplican</h2><div class="escgrid">${l.escalas.map(escalaHTML).join("")}</div>` : "";
     if (l.entender) h += entenderHTML(l);
     if (l.cadena) {
       const c = l.cadena;
@@ -509,6 +673,12 @@
         ${c.html ? `<div class="libre">${c.html}</div>` : ""}<div class="fuente">${c.fuente}</div>`;
     }
     if (l.esquema) h += esquemaHTML(l);
+    // tabla: cada celda lleva el nombre de su columna (data-th) para verse como tarjetas en el celular
+    const thTxt = x => x.replace(/<[^>]+>/g, "").replace(/"/g, "&quot;");
+    if (l.tabla) h += `<h2 id="tabla">📋 Tabla comparativa <small style="font-size:14px;color:var(--tx2);font-weight:500">toca una fila para resaltarla</small></h2>
+      <div class="tabla-wrap"><table class="tabla t2"><thead><tr>${l.tabla.cab.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>
+      ${l.tabla.filas.map((f, i) => `<tr class="f${i % 6}${/^\s*(<[^>]+>)*\s*🔑/.test(f[0]) ? " clave-fila" : ""}">${f.map((x, k) => `<td data-th="${thTxt(l.tabla.cab[k] || "")}">${x}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    h += escH;
     h += `${l.memoria && l.memoria.length ? `<h2 id="memoria">🧠 Cómo recordarlo <small style="font-size:14px;color:var(--tx2);font-weight:500">primero entiéndelo; esto es solo para los datos duros</small></h2>
         <div class="mem-grid">${l.memoria.map(m => `<div class="mem-card"><div class="mem-cab"><span class="mem-ic">${m.icono}</span><b>${m.tipo}</b></div>
           <div class="mem-dato">${m.dato}</div>${m.tecnica ? `<div class="mem-tec">${m.tecnica}</div>` : ""}
@@ -522,11 +692,9 @@
       <div class="pista-c" id="fichas">${l.preguntas.map(fichaHTML).join("")}</div>
       <button class="cnav next" id="c-next" title="Siguiente (→)">›</button></div>
       <div class="c-pie"><span id="c-pos"></span><div class="puntos" id="puntos"></div><span class="kbd">← → mover · espacio voltear · a–e elegir alternativa · 1 la sé · 2 repasar</span></div>`;
-    // tabla: cada celda lleva el nombre de su columna (data-th) para verse como tarjetas en el celular
-    const thTxt = x => x.replace(/<[^>]+>/g, "").replace(/"/g, "&quot;");
-    if (l.tabla) h += `<h2 id="tabla">📋 Tabla comparativa <small style="font-size:14px;color:var(--tx2);font-weight:500">toca una fila para resaltarla</small></h2>
-      <div class="tabla-wrap"><table class="tabla t2"><thead><tr>${l.tabla.cab.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>
-      ${l.tabla.filas.map((f, i) => `<tr class="f${i % 6}${/^\s*(<[^>]+>)*\s*🔑/.test(f[0]) ? " clave-fila" : ""}">${f.map((x, k) => `<td data-th="${thTxt(l.tabla.cab[k] || "")}">${x}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    // al terminar la lámina: la anterior y la siguiente en el orden del curso, con su nombre
+    const pie = (x, d) => x ? `<a class="sigl ${d < 0 ? "ant" : "sig"}" href="#/l/${x.n}"><small>${d < 0 ? "← Anterior" : "Siguiente →"}${grupoDe(x) !== g ? ` · ${grupoDe(x).icono} ${grupoDe(x).nombre}` : ""}</small><b>${x.titulo}</b></a>` : "<span></span>";
+    h += `<nav class="pie-lam">${pie(ant, -1)}${pie(sig, 1)}</nav>`;
     vista.innerHTML = h;
     montarLienzo(l);
     if (l.cadena) montarCadena();
@@ -544,8 +712,18 @@
     // la pestaña de la sección que se está leyendo queda marcada
     const secs = $$(".pestanas a[href*='/" + l.n + "/']").map(a => [a, document.getElementById(a.getAttribute("href").split("/").pop())]).filter(x => x[1])
       .sort((p, q) => p[1].compareDocumentPosition(q[1]) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+    // ruta de estudio: el paso que se lee queda hecho (tras 4 s en pantalla, no al pasar de largo)
+    const pintaRuta = () => { const e = estadoLam(l), c = $("#ruta-est"); if (!c) return;
+      const comp = (P.comp || {})[l.n] || 0;
+      c.innerHTML = `<span class="ruta-t">Tu ruta · ${e.h}/${e.total}</span>${e.ps.map((p, i) => `<a href="#/l/${l.n}/${p.id}" class="${p.hecho ? "hecho" : p === e.sig ? "sig" : ""}"><i>${p.hecho ? "✓" : i + 1}</i>${p.ic} ${p.t}</a>`).join("<b>›</b>")}
+        <span class="ruta-msg">${!e.sig ? "🎉 Lámina completa: ahora vuelve cuando el plan de hoy te lo pida." : e.sig.id === "entender" && (P.ruta || {})[l.n] && P.ruta[l.n].entender && comp < 7 ? "Puntúate en el comprensiómetro: con menos de 7, relee antes de memorizar." : e.sig.id === "memoria" && comp && comp < 7 ? "Primero entiéndelo (comprensiómetro ≥ 7); memoriza solo los datos duros." : e.sig.id === "preguntas" ? "Responde sin mirar; lo que falles vuelve mañana." : ""}</span>`;
+      $$("a", c).forEach(a => a.onclick = ev => { const el = document.getElementById(a.getAttribute("href").split("/").pop()); if (el) { ev.preventDefault(); el.scrollIntoView({ behavior: "smooth" }); } }); };
+    pintaRuta(); window.__ruta = pintaRuta;
+    let enVista = null, tVisto = 0;
     const espia = () => { let act = secs[0]; for (const x of secs) if (x[1].getBoundingClientRect().top < 160) act = x;
-      secs.forEach(x => x[0].classList.toggle("act", x === act)); };
+      secs.forEach(x => x[0].classList.toggle("act", x === act));
+      const id = act && act[1].id; if (id !== enVista) { enVista = id; clearTimeout(tVisto);
+        if (id && pasosDe(l).some(p => p.id === id && p.id !== "preguntas")) tVisto = setTimeout(() => { if (enVista === id && location.hash.startsWith(`#/l/${l.n}`) && visto(l, id)) { pintaRuta(); marcarIndice(location.hash.replace(/^#\/?/, "").split("/")); } }, 4000); } };
     removeEventListener("scroll", window.__espia || (() => {})); window.__espia = espia; addEventListener("scroll", espia, { passive: true }); espia();
     if (sub) setTimeout(() => {
       if (/^q\d+$/.test(sub)) irPregunta(l, +sub.slice(1));
@@ -749,8 +927,8 @@
     const visibles = () => $$(".ficha", cont).filter(f => f.style.display !== "none");
     const cuenta = () => { const c = $("#cuenta"); if (c) c.textContent = `${visibles().length} de ${l.preguntas.length}`; };
     let actual = null;
-    const fijar = (id, v) => { P.q = P.q || {}; P.q[id] = v; guardar(P); progChip(); };
-    const progChip = () => { const c = $("#prog-l"); if (c) c.textContent = `${progresoLamina(l)[0]}/${l.preguntas.length} ✓`; };
+    const fijar = (id, v) => { P.q = P.q || {}; P.q[id] = v; guardar(P); calificar(id, v === "ok" ? "bien" : "otra"); progChip(); };
+    const progChip = () => { const c = $("#prog-l"); if (c) c.textContent = `${progresoLamina(l)[0]}/${l.preguntas.length} ✓`; if (window.__ruta && c) window.__ruta(); };
     function responder(f, k) {
       if (f.classList.contains("respondida")) return;
       const ok = k === f.dataset.letra;
@@ -836,6 +1014,66 @@
     };
     cuenta();
     return { responder };
+  }
+
+  /* ---------- repaso de hoy (skills estudio-recuerdo-activo + estudio-repeticion-espaciada) ----------
+     Solo lo vencido, en el orden del curso. Pregunta → respuesta sin mirar → semáforo honesto:
+     🔴 Otra vez · 🟡 Difícil · 🟢 Bien · 🔵 Fácil. Rojo y amarillo vuelven al final de la cola (rondas hasta cero
+     errores); verde y azul salen hasta su próxima fecha. Al final, el resumen y cuándo vuelve cada grupo. */
+  function vistaHoy() {
+    const pos = new Map(ORDEN.map((l, i) => [l, i]));
+    let cola = vencidas().sort((a, b) => pos.get(a.l) - pos.get(b.l) || (srs(b.q.id).f || 0) - (srs(a.q.id).f || 0));
+    const total = cola.length, res = { otra: 0, dificil: 0, bien: 0, facil: 0 }, primera = new Set(); let ronda = 1, enRonda = cola.length, api = null;
+    if (!total) {
+      const p = proximo();
+      vista.innerHTML = `<div class="repaso"><h1>📅 Repaso de hoy</h1><div class="hoy-fin"><div class="hoy-ic">✅</div><h2>No tienes repasos vencidos</h2>
+        <p>${p ? `El próximo es el <b>${fFecha(p[0])}</b> (${p[1]} pregunta${p[1] > 1 ? "s" : ""}).` : "Todavía no has respondido preguntas: empieza una lámina y responde sus preguntas sin mirar."}</p>
+        <p>Mientras tanto, avanza la siguiente lámina del curso o haz un simulacro.</p><div class="nav"><a class="btn" href="#/">← Volver al plan de hoy</a><a class="btn sec" href="#/repaso/examen">📝 Simulacro</a></div></div></div>`;
+      return;
+    }
+    const SEM = [["otra", "🔴 Otra vez", "1", "no la sabías"], ["dificil", "🟡 Difícil", "2", "te costó muchísimo"], ["bien", "🟢 Bien", "3", "con esfuerzo"], ["facil", "🔵 Fácil", "4", "sin esfuerzo"]];
+    const pinta = () => {
+      if (!cola.length) return fin();
+      const x = cola[0], q = x.q, s = srs(q.id) || {};
+      vista.innerHTML = `<div class="repaso hoy"><h1>📅 Repaso de hoy <small>responde sin mirar y califícate con honestidad</small></h1>
+        <div class="hoy-barra"><span>Ronda ${ronda} · quedan <b>${cola.length}</b> de ${total}</span><span>🔴 ${res.otra} · 🟡 ${res.dificil} · 🟢 ${res.bien} · 🔵 ${res.facil}</span>
+          <div class="barra-prog"><i style="width:${pct(total - cola.length, total)}%"></i></div></div>
+        <div class="filtros"><span class="cuenta" style="margin-left:0">Lámina ${x.l.n}: <a href="#/l/${x.l.n}/q${q.n}">${x.l.titulo}</a>${(s.f || 0) >= 3 ? ` · <b class="editar">✏️ La fallaste 3 veces seguidas: vuelve a la lámina y recodifícala</b>` : ""}</span></div>
+        <div class="fichas sin-marcar" id="fichas" style="grid-template-columns:1fr">${fichaHTML(q)}</div>
+        <div class="semaforo" id="semaforo" hidden>${SEM.map(([k, t, n, d]) => `<button data-s="${k}" class="s-${k}"><b>${t}</b><small>${d} · tecla ${n}</small></button>`).join("")}</div>
+        <p class="hoy-ayuda" id="hoy-ayuda">Piensa la respuesta <b>antes</b> de voltear (espacio). Luego elige el color.</p>
+        <div class="kbd">espacio = ver respuesta · a–e = alternativa · 1–4 = semáforo</div></div>`;
+      ocultar(); api = montarFichas(x.l); enlazar(vista, x.l); vista.normalize(); siglas(vista); conceptos(vista);
+      const f = $(".ficha", vista), sem = $("#semaforo");
+      const mostrar = () => { if (sem.hidden) { sem.hidden = false; $("#hoy-ayuda").textContent = "¿Cómo te fue? Si dudaste, no es verde."; } };
+      new MutationObserver(() => { if (f.classList.contains("vuelta") || f.classList.contains("respondida")) mostrar(); }).observe(f, { attributes: true, attributeFilter: ["class"] });
+      $$("button", sem).forEach(b => b.onclick = () => notar(b.dataset.s));
+      $$(".ref", vista).forEach(a => a.onclick = ev => { ev.preventDefault(); location.hash = `#/l/${x.l.n}/q${a.dataset.n}`; });
+    };
+    function notar(k) {
+      const x = cola.shift(), id = x.q.id;
+      if (!primera.has(id)) { primera.add(id); res[k]++; calificar(id, k, true); }   // la primera nota del día manda
+      if (k === "otra" || k === "dificil") cola.push(x); else SON.bien();
+      if (k === "otra" || k === "dificil") SON.repasar();
+      if (--enRonda <= 0) { ronda++; enRonda = cola.length; if (cola.length) toast(`Ronda ${ronda}: solo las ${cola.length} que fallaste`, ""); }
+      pinta(); window.scrollTo(0, 0);
+    }
+    function fin() {
+      const p = proximo(); SON.fanfarria();
+      vista.innerHTML = `<div class="repaso"><h1>📅 Repaso de hoy</h1><div class="hoy-fin"><div class="hoy-ic">🎉</div><h2>Cero errores: repaso terminado</h2>
+        <p>${total} pregunta${total > 1 ? "s" : ""} en ${ronda - 1 || 1} ronda${ronda - 1 > 1 ? "s" : ""}. A la primera: 🟢 ${res.bien} · 🔵 ${res.facil} · 🟡 ${res.dificil} · 🔴 ${res.otra}.</p>
+        <p>Las rojas y amarillas vuelven <b>mañana</b>; las verdes y azules, más adelante.${p ? ` Próximo repaso: <b>${fFecha(p[0])}</b>.` : ""}</p>
+        <div class="nav"><a class="btn" href="#/">▶ Seguir con la lámina nueva</a><a class="btn sec" href="#/repaso/examen">📝 Simulacro</a></div></div></div>`;
+    }
+    pinta();
+    document.onkeydown = ev => {
+      if (sinAtajo(ev)) return;
+      const f = $(".hoy .ficha"); if (!f) return;
+      const mc = f.classList.contains("mc"), sem = $("#semaforo");
+      if (ev.key === " ") { ev.preventDefault(); if (mc) api.responder(f, ""); else { SON.giro(); f.classList.add("vuelta"); } }
+      else if (mc && /^[a-e]$/i.test(ev.key) && $(`.opw[data-k="${ev.key.toLowerCase()}"]`, f)) { ev.preventDefault(); api.responder(f, ev.key.toLowerCase()); }
+      else if (/^[1-4]$/.test(ev.key) && sem && !sem.hidden) { ev.preventDefault(); notar(SEM[+ev.key - 1][0]); }
+    };
   }
 
   /* ---------- repaso global ---------- */
