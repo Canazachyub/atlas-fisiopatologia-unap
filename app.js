@@ -378,6 +378,20 @@
     const alto = () => document.documentElement.style.setProperty("--barra", bar.offsetHeight + "px");
     alto(); addEventListener("resize", alto);
   }
+  /* ---------- barra inferior (celular): lo diario a un toque del pulgar ---------- */
+  const tabbar = document.createElement("nav"); tabbar.id = "tabbar"; tabbar.setAttribute("aria-label", "Navegación principal");
+  document.body.appendChild(tabbar);
+  function pintarTabbar(h) {
+    const v = vencidas().length, sim = unicas().some(x => (x.q.ex || []).length), r = h[0] || "";
+    const act = k => (k === r || (k === "" && (r === "" || r === "grupo")) ? " act" : "");
+    tabbar.innerHTML = `<a href="#/" class="${act("")}"><i>🏠</i>Inicio</a>
+      <a href="#/hoy" class="${act("hoy")}${v ? " urge" : ""}"><i>📅${v ? `<b>${v > 99 ? "99+" : v}</b>` : ""}</i>Hoy</a>
+      <button type="button" id="tab-temas" class="${r === "l" ? " act" : ""}"><i>📚</i>Temas</button>
+      <a href="#/repaso" class="${r === "repaso" && h[1] !== "examen" ? " act" : ""}"><i>🔥</i>Repaso</a>
+      ${sim ? `<a href="#/repaso/examen" class="${r === "repaso" && h[1] === "examen" ? " act" : ""}"><i>📝</i>Simulacro</a>` : ""}`;
+    $("#tab-temas", tabbar).onclick = () => document.body.classList.toggle("indice-abierto");
+  }
+  const movil = () => matchMedia("(max-width:820px)").matches;
   function pintarIndice() {
     const abiertos = new Set($$("details[open]", indice).map(d => d.dataset.g));
     const primero = !indice.innerHTML;
@@ -402,6 +416,7 @@
   }
   function marcarIndice(h) {
     pintarIndice();   // se repinta para que el avance (✓) quede al día
+    pintarTabbar(h);
     const r = h.join("/"), n = h[0] === "l" ? h[1] : null;
     let act = n ? $(`a[data-n="${n}"]`, indice) : $(`a[data-r="${h[0] === "repaso" ? r.replace(/\/$/, "") : h[0] === "examen" ? r : h[0] === "hoy" ? "hoy" : "inicio"}"]`, indice);
     if (!act && h[0] === "grupo") act = $(`details[data-g="${h[1]}"] summary`, indice);
@@ -410,6 +425,8 @@
       if (top < 80 || top > alto - 40) act.scrollIntoView({ block: "center" }); }
   }
   addEventListener("hashchange", ruta);
+  // celular: la introducción de la lámina se muestra recortada; un toque la abre entera
+  document.addEventListener("click", ev => { const e = ev.target.closest && ev.target.closest(".lema-l"); if (e && !ev.target.closest("a,button,abbr,[data-c],.sig,.conc")) e.classList.toggle("abierta"); });
   let timers = [];
   let teclas = [];
   function detenerTodo() { window.__ruta = null; timers.forEach(clearTimeout); timers = []; teclas = []; document.onkeydown = null; ocultar();
@@ -497,6 +514,8 @@
       h += "</div>";
     }
     vista.innerHTML = h;
+    // en el celular lo primero que se ve es qué hacer hoy; la portada va después
+    if (movil()) { const ph = $(".plan-hoy", vista), po = $(".portada", vista); if (ph && po) vista.insertBefore(ph, po); }
     { const fx = $("#f-examen"); if (fx) fx.onchange = () => { P.examen = fx.value || ""; if (!P.examen) delete P.examen; guardar(P); vistaInicio(); marcarIndice([""]); }; }
     $$(".mapa-curso a").forEach(a => a.onclick = ev => { ev.preventDefault(); const s = document.getElementById("g-" + a.dataset.g); s && s.scrollIntoView({ behavior: "smooth" }); });
     const inp = $("#buscar"), res = $("#resultados");
@@ -637,7 +656,7 @@
     const mods = (A.modulos || []).filter(m => (m.laminas || []).includes(l.n));
     // pestañas en el mismo orden en que aparecen las secciones: ver → entender → mecanismo → mapa → comparar → medir → recordar → preguntarse
     let h = `<div class="migas"><a href="#/">Inicio</a> › <a href="#/grupo/${g.id}">${gi + 1}. ${g.icono} ${g.nombre}</a> › <span>Lámina ${k + 1} de ${hermanas.length} del tema</span></div>
-      <h1>Lámina ${l.n} · ${l.titulo} <small>${l.subtitulo}</small></h1><div class="lema">${l.lema}</div>
+      <h1>Lámina ${l.n} · ${l.titulo} <small>${l.subtitulo}</small></h1><div class="lema lema-l">${l.lema}</div>
       <div class="ruta-est" id="ruta-est"></div>
       <nav class="pestanas"><a href="#/l/${l.n}/imagen">🖼️ Imagen</a>${l.entender ? `<a href="#/l/${l.n}/entender">📖 Entiéndelo</a>` : ""}${l.cadena ? `<a href="#/l/${l.n}/cadena">⚙️ ${l.cadena.titulo}</a>` : ""}${l.esquema ? `<a href="#/l/${l.n}/esquema">🗺️ Esquema</a>` : ""}${l.tabla ? `<a href="#/l/${l.n}/tabla">📋 Tabla</a>` : ""}${l.escalas && l.escalas.length ? `<a href="#/l/${l.n}/escalas">📏 Escalas (${l.escalas.length})</a>` : ""}${l.memoria && l.memoria.length ? `<a href="#/l/${l.n}/memoria">🧠 Recordarlo</a>` : ""}
       <a href="#/l/${l.n}/preguntas">❓ Preguntas <span class="prog" id="prog-l">${progresoLamina(l)[0]}/${l.preguntas.length} ✓</span></a>${mods.map(m => `<a class="p-mod" href="${m.href}">${m.enlace}</a>`).join("")}
@@ -1056,7 +1075,7 @@
       if (k === "otra" || k === "dificil") cola.push(x); else SON.bien();
       if (k === "otra" || k === "dificil") SON.repasar();
       if (--enRonda <= 0) { ronda++; enRonda = cola.length; if (cola.length) toast(`Ronda ${ronda}: solo las ${cola.length} que fallaste`, ""); }
-      pinta(); window.scrollTo(0, 0);
+      pinta(); pintarTabbar(["hoy"]); window.scrollTo(0, 0);
     }
     function fin() {
       const p = proximo(); SON.fanfarria();
